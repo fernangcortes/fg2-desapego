@@ -1,0 +1,173 @@
+{% extends 'base.html' %}
+
+{% block title %}Exportar Anúncio - {{ item.titulo }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <!-- Cabeçalho -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <div>
+            <div class="flex items-center gap-2">
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 uppercase">
+                    {{ item.get_status_display }}
+                </span>
+                <span class="text-xs text-slate-500">{{ item.get_categoria_display }}</span>
+            </div>
+            <h1 class="text-xl sm:text-2xl font-black text-slate-900 mt-1">{{ item.titulo }}</h1>
+            <p class="text-sm text-slate-600">Copie as descrições otimizadas com 1 clique para postar nos seus marketplaces favoritos.</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <a href="/admin/core/item/{{ item.id }}/change/" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors">
+                ← Voltar ao Admin
+            </a>
+            <a href="/item/{{ item.slug }}/" target="_blank" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors">
+                Ver no Site ↗
+            </a>
+        </div>
+    </div>
+
+    <!-- Navegação por Abas -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden" x-data="{ tab: 'olx' }">
+        <div class="flex border-b border-slate-200 bg-slate-50 overflow-x-auto">
+            <button onclick="switchTab('olx')" id="tab-btn-olx"
+                class="tab-btn px-6 py-3.5 text-sm font-bold border-b-2 border-emerald-600 text-emerald-700 bg-white flex items-center gap-2 whitespace-nowrap">
+                <span>🟠 OLX</span>
+                <span class="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">Texto Puro</span>
+            </button>
+            <button onclick="switchTab('ml')" id="tab-btn-ml"
+                class="tab-btn px-6 py-3.5 text-sm font-semibold border-b-2 border-transparent text-slate-600 hover:text-slate-900 flex items-center gap-2 whitespace-nowrap">
+                <span>🟡 Mercado Livre</span>
+            </button>
+            <button onclick="switchTab('fb')" id="tab-btn-fb"
+                class="tab-btn px-6 py-3.5 text-sm font-semibold border-b-2 border-transparent text-slate-600 hover:text-slate-900 flex items-center gap-2 whitespace-nowrap">
+                <span>🔵 Facebook</span>
+            </button>
+            <button onclick="switchTab('wa')" id="tab-btn-wa"
+                class="tab-btn px-6 py-3.5 text-sm font-semibold border-b-2 border-transparent text-slate-600 hover:text-slate-900 flex items-center gap-2 whitespace-nowrap">
+                <span>🟢 WhatsApp & Link</span>
+            </button>
+        </div>
+
+        <!-- Conteúdo das Abas -->
+        <div class="p-6 space-y-4">
+            <!-- Aba OLX -->
+            <div id="tab-content-olx" class="tab-content space-y-3">
+                <div class="flex items-center justify-between">
+                    <p class="text-xs text-slate-500">Formatado para o campo de descrição da <strong>OLX</strong> (sem markdown quebrado).</p>
+                    <button onclick="copyToClipboard('olxTextarea', 'copiedBadgeOlx')"
+                        class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center gap-1.5 active:scale-95">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        <span>Copiar Descrição OLX</span>
+                    </button>
+                </div>
+                <textarea id="olxTextarea" rows="12" readonly
+                    class="w-full p-4 bg-slate-50 border border-slate-300 rounded-xl font-mono text-xs text-slate-800 focus:outline-none">{{ olx_text }}</textarea>
+                <div id="copiedBadgeOlx" class="hidden text-xs font-bold text-emerald-600 animate-pulse">✓ Descrição da OLX copiada com sucesso para a área de transferência!</div>
+            </div>
+
+            <!-- Aba Mercado Livre -->
+            <div id="tab-content-ml" class="tab-content hidden space-y-3">
+                <div class="flex items-center justify-between">
+                    <p class="text-xs text-slate-500">Estruturado para a descrição do <strong>Mercado Livre</strong>.</p>
+                    <button onclick="copyToClipboard('mlTextarea', 'copiedBadgeMl')"
+                        class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold rounded-xl shadow-sm transition-all flex items-center gap-1.5 active:scale-95">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        <span>Copiar Descrição ML</span>
+                    </button>
+                </div>
+                <textarea id="mlTextarea" rows="12" readonly
+                    class="w-full p-4 bg-slate-50 border border-slate-300 rounded-xl font-mono text-xs text-slate-800 focus:outline-none">{{ ml_text }}</textarea>
+                <div id="copiedBadgeMl" class="hidden text-xs font-bold text-amber-600 animate-pulse">✓ Descrição do Mercado Livre copiada!</div>
+            </div>
+
+            <!-- Aba Facebook -->
+            <div id="tab-content-fb" class="tab-content hidden space-y-3">
+                <div class="flex items-center justify-between">
+                    <p class="text-xs text-slate-500">Texto direto e compacto para <strong>Facebook Marketplace</strong> e grupos.</p>
+                    <button onclick="copyToClipboard('fbTextarea', 'copiedBadgeFb')"
+                        class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center gap-1.5 active:scale-95">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        <span>Copiar Texto Facebook</span>
+                    </button>
+                </div>
+                <textarea id="fbTextarea" rows="10" readonly
+                    class="w-full p-4 bg-slate-50 border border-slate-300 rounded-xl font-mono text-xs text-slate-800 focus:outline-none">{{ fb_text }}</textarea>
+                <div id="copiedBadgeFb" class="hidden text-xs font-bold text-blue-600 animate-pulse">✓ Texto do Facebook copiado!</div>
+            </div>
+
+            <!-- Aba WhatsApp & Link Direto -->
+            <div id="tab-content-wa" class="tab-content hidden space-y-6">
+                <div class="p-4 bg-emerald-50 rounded-xl border border-emerald-200 space-y-3">
+                    <h3 class="font-bold text-emerald-950 text-sm">Mensagem Padrão de Cotação WhatsApp</h3>
+                    <p class="text-xs text-emerald-800 font-mono p-3 bg-white rounded-lg border border-emerald-200">
+                        {{ wa_data.mensagem }}
+                    </p>
+                    <div class="flex gap-2">
+                        <button onclick="navigator.clipboard.writeText('{{ wa_data.mensagem|escapejs }}'); alert('Mensagem copiada!');"
+                            class="px-3 py-1.5 bg-emerald-700 text-white text-xs font-bold rounded-lg hover:bg-emerald-800 transition-colors">
+                            Copiar Texto
+                        </button>
+                        <a href="{{ wa_data.whatsapp_url }}" target="_blank"
+                            class="px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 transition-colors">
+                            Testar Abertura WhatsApp ↗
+                        </a>
+                    </div>
+                </div>
+
+                <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                    <h3 class="font-bold text-slate-800 text-sm">Link Direto da Vitrine</h3>
+                    <div class="flex gap-2">
+                        <input type="text" id="directLinkInput" value="{{ direct_link }}" readonly
+                            class="flex-1 px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono">
+                        <button onclick="copyToClipboard('directLinkInput', 'copiedBadgeLink')"
+                            class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-lg transition-colors">
+                            Copiar Link
+                        </button>
+                    </div>
+                    <div id="copiedBadgeLink" class="hidden text-xs font-bold text-emerald-600 animate-pulse">✓ Link direto copiado!</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function switchTab(tabName) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('.tab-btn').forEach(el => {
+            el.classList.remove('border-emerald-600', 'text-emerald-700', 'bg-white');
+            el.classList.add('border-transparent', 'text-slate-600');
+        });
+
+        const activeContent = document.getElementById('tab-content-' + tabName);
+        const activeBtn = document.getElementById('tab-btn-' + tabName);
+
+        if (activeContent) activeContent.classList.remove('hidden');
+        if (activeBtn) {
+            activeBtn.classList.remove('border-transparent', 'text-slate-600');
+            activeBtn.classList.add('border-emerald-600', 'text-emerald-700', 'bg-white');
+        }
+    }
+
+    function copyToClipboard(elementId, badgeId) {
+        const el = document.getElementById(elementId);
+        if (el) {
+            el.select();
+            navigator.clipboard.writeText(el.value);
+            if (badgeId) {
+                const badge = document.getElementById(badgeId);
+                badge.classList.remove('hidden');
+                setTimeout(() => badge.classList.add('hidden'), 3500);
+            }
+        }
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,18 @@
+[Unit]
+Description=Gunicorn daemon para Hub de Desapego Inteligente
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/hub-desapego
+Environment="PATH=/var/www/hub-desapego/venv/bin"
+ExecStart=/var/www/hub-desapego/venv/bin/gunicorn --config /var/www/hub-desapego/deploy/gunicorn_config.py config.wsgi:application
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=10
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

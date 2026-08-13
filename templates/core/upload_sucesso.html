@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+
+{% block title %}Item Registrado com Sucesso! - Hub de Desapego{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto space-y-6 text-center py-4">
+    <!-- Ícone de Sucesso -->
+    <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-sm">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+        </svg>
+    </div>
+
+    <div>
+        <h1 class="text-2xl font-black text-slate-900 tracking-tight">Rascunho Salvo!</h1>
+        <p class="text-sm text-slate-600 mt-1">
+            Seu item foi registrado com <strong>{{ total_fotos }} foto(s)</strong> vinculadas.
+        </p>
+    </div>
+
+    <!-- Card de Resumo do Item -->
+    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm text-left flex gap-4 items-center">
+        {% if item.imagem_principal %}
+            <img src="{{ item.imagem_principal.imagem.url }}" alt="{{ item.titulo }}" class="w-20 h-20 rounded-xl object-cover border border-slate-200 shadow-sm">
+        {% else %}
+            <div class="w-20 h-20 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 text-xs">
+                Sem foto
+            </div>
+        {% endif %}
+        <div class="flex-1 min-w-0">
+            <span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-100 text-amber-800 uppercase tracking-wide">
+                {{ item.get_status_display }}
+            </span>
+            <h2 class="text-base font-bold text-slate-900 truncate mt-1">{{ item.titulo }}</h2>
+            <p class="text-xs text-slate-500 truncate">{{ item.get_categoria_display }} • {{ item.get_tipo_anuncio_display }}</p>
+            {% if item.defeitos_visiveis %}
+                <p class="text-xs text-slate-400 truncate mt-0.5">Obs: {{ item.defeitos_visiveis }}</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Card de Ação da IA -->
+    <div class="p-4 bg-purple-50 rounded-2xl border border-purple-200 text-left space-y-3">
+        <div class="flex items-start gap-2">
+            <span class="text-xl">✨</span>
+            <div class="text-xs text-purple-950 leading-relaxed">
+                <strong>Orquestrador de IA pronto:</strong><br>
+                Execute a análise de visão computacional, pesquisa de preços e copywriting agora ou faça em lote pelo painel.
+            </div>
+        </div>
+        <a href="{% url 'ai_engine:process_item' item.id %}"
+            class="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center justify-center gap-1.5 active:scale-[0.98]">
+            <span>🤖 Executar IA no Item Agora</span>
+        </a>
+    </div>
+
+    <!-- Botões de Ação -->
+    <div class="space-y-3 pt-2">
+        <a href="{% url 'core:upload_rapido' %}"
+            class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2 active:scale-[0.98]">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span>Fotografar Próximo Item</span>
+        </a>
+
+        <div class="grid grid-cols-2 gap-3">
+            <a href="/admin/core/item/{{ item.id }}/change/"
+                class="py-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold text-xs rounded-xl shadow-sm transition-colors flex items-center justify-center gap-1.5">
+                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                <span>Editar no Admin</span>
+            </a>
+
+            <a href="/"
+                class="py-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold text-xs rounded-xl shadow-sm transition-colors flex items-center justify-center gap-1.5">
+                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                </svg>
+                <span>Ver Vitrine</span>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

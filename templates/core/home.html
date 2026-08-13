@@ -1,0 +1,177 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Hub de Desapego - Itens Incríveis para Venda e Aluguel{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Hero / Banner do Vendedor -->
+    <div class="bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-3xl p-6 sm:p-10 shadow-xl relative overflow-hidden">
+        <div class="relative z-10 max-w-2xl space-y-3">
+            <span class="inline-block px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full text-xs font-bold tracking-wide uppercase">
+                ✨ Desapego Pessoal Transparente
+            </span>
+            <h1 class="text-3xl sm:text-4xl font-black tracking-tight text-white">
+                {{ configuracao.nome_vendedor }}
+            </h1>
+            <p class="text-slate-300 text-sm sm:text-base leading-relaxed">
+                {{ configuracao.mensagem_boas_vindas }}
+            </p>
+            {% if configuracao.whatsapp %}
+                <div class="pt-2">
+                    <a href="https://wa.me/{{ configuracao.whatsapp|cut:' ' }}" target="_blank"
+                        class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-md transition-all active:scale-95">
+                        <span>Falar com o Vendedor no WhatsApp</span>
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/></svg>
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+        <!-- Efeito sutil de fundo -->
+        <div class="absolute -right-10 -bottom-10 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+    </div>
+
+    <!-- Barra de Filtros e Busca -->
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+        <!-- Abas Venda / Aluguel -->
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+            <div class="flex bg-slate-100 p-1 rounded-xl">
+                <a href="?tipo=todos{% if categoria_filtro %}&categoria={{ categoria_filtro }}{% endif %}{% if busca %}&q={{ busca }}{% endif %}"
+                    class="flex-1 sm:flex-none text-center px-4 py-2 rounded-lg text-xs font-bold transition-all {% if tipo_filtro == 'todos' %}bg-white text-slate-900 shadow-sm{% else %}text-slate-600 hover:text-slate-900{% endif %}">
+                    Todos ({{ total_aprovados }})
+                </a>
+                <a href="?tipo=venda{% if categoria_filtro %}&categoria={{ categoria_filtro }}{% endif %}{% if busca %}&q={{ busca }}{% endif %}"
+                    class="flex-1 sm:flex-none text-center px-4 py-2 rounded-lg text-xs font-bold transition-all {% if tipo_filtro == 'venda' %}bg-white text-slate-900 shadow-sm{% else %}text-slate-600 hover:text-slate-900{% endif %}">
+                    🏷️ Venda ({{ total_venda }})
+                </a>
+                <a href="?tipo=aluguel{% if categoria_filtro %}&categoria={{ categoria_filtro }}{% endif %}{% if busca %}&q={{ busca }}{% endif %}"
+                    class="flex-1 sm:flex-none text-center px-4 py-2 rounded-lg text-xs font-bold transition-all {% if tipo_filtro == 'aluguel' %}bg-white text-slate-900 shadow-sm{% else %}text-slate-600 hover:text-slate-900{% endif %}">
+                    🔄 Aluguel ({{ total_aluguel }})
+                </a>
+            </div>
+
+            <!-- Campo de Busca -->
+            <form method="GET" class="flex gap-2 flex-1 sm:max-w-xs">
+                {% if tipo_filtro %}<input type="hidden" name="tipo" value="{{ tipo_filtro }}">{% endif %}
+                {% if categoria_filtro %}<input type="hidden" name="categoria" value="{{ categoria_filtro }}">{% endif %}
+                <div class="relative flex-1">
+                    <input type="text" name="q" value="{{ busca }}" placeholder="Buscar por produto ou marca..."
+                        class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all">
+                    <svg class="w-4 h-4 text-slate-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                </div>
+                <button type="submit" class="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-colors">
+                    Buscar
+                </button>
+            </form>
+        </div>
+
+        <!-- Filtro Rápido por Categorias -->
+        <div class="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+            <span class="text-slate-400 font-semibold uppercase text-[10px] tracking-wider whitespace-nowrap">Categorias:</span>
+            <a href="?{% if tipo_filtro %}tipo={{ tipo_filtro }}{% endif %}{% if busca %}&q={{ busca }}{% endif %}"
+                class="px-3 py-1.5 rounded-full font-medium whitespace-nowrap transition-colors {% if not categoria_filtro %}bg-emerald-600 text-white font-bold{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
+                Todas
+            </a>
+            {% for valor, rotulo in categorias %}
+                <a href="?categoria={{ valor }}{% if tipo_filtro %}&tipo={{ tipo_filtro }}{% endif %}{% if busca %}&q={{ busca }}{% endif %}"
+                    class="px-3 py-1.5 rounded-full font-medium whitespace-nowrap transition-colors {% if categoria_filtro == valor %}bg-emerald-600 text-white font-bold{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
+                    {{ rotulo }}
+                </a>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Grid de Produtos da Vitrine -->
+    {% if itens %}
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {% for item in itens %}
+                <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col group">
+                    <!-- Foto de Capa -->
+                    <a href="{% url 'core:item_detail' item.slug %}" class="block relative aspect-4/3 overflow-hidden bg-slate-100">
+                        {% if item.imagem_principal %}
+                            <img src="{{ item.imagem_principal.imagem.url }}" alt="{{ item.titulo }}"
+                                class="w-full h-48 sm:h-52 object-cover group-hover:scale-105 transition-transform duration-500">
+                        {% else %}
+                            <div class="w-full h-48 sm:h-52 flex items-center justify-center text-slate-400 text-xs">
+                                Sem foto
+                            </div>
+                        {% endif %}
+                        <!-- Badges Sobrepostos -->
+                        <div class="absolute top-2 left-2 flex flex-col gap-1">
+                            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-white/90 backdrop-blur-md text-slate-800 shadow-sm">
+                                {{ item.get_categoria_display }}
+                            </span>
+                            {% if item.tipo_anuncio == 'ambos' %}
+                                <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-600 text-white shadow-sm">
+                                    Venda & Aluguel
+                                </span>
+                            {% elif item.tipo_anuncio == 'aluguel' %}
+                                <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-600 text-white shadow-sm">
+                                    Aluguel
+                                </span>
+                            {% endif %}
+                        </div>
+                    </a>
+
+                    <!-- Informações do Item -->
+                    <div class="p-4 flex-1 flex flex-col justify-between space-y-3">
+                        <div>
+                            <span class="text-[11px] font-semibold text-emerald-700">
+                                {{ item.get_estado_conservacao_display }}
+                            </span>
+                            <h2 class="font-bold text-slate-900 text-sm line-clamp-2 mt-0.5 group-hover:text-emerald-600 transition-colors">
+                                <a href="{% url 'core:item_detail' item.slug %}">{{ item.titulo }}</a>
+                            </h2>
+                            <p class="text-xs text-slate-500 line-clamp-2 mt-1">
+                                {{ item.descricao_efetiva|default:"Item testado e pronto para entrega." }}
+                            </p>
+                        </div>
+
+                        <!-- Precificação e Ação -->
+                        <div class="pt-3 border-t border-slate-100 space-y-2">
+                            <div class="flex items-baseline justify-between">
+                                {% if item.preco_usado %}
+                                    <div>
+                                        <span class="text-[10px] text-slate-400 uppercase font-bold block">Valor de Venda</span>
+                                        <span class="text-lg font-black text-slate-900">R$ {{ item.preco_usado|intcomma }}</span>
+                                    </div>
+                                {% elif item.preco_aluguel %}
+                                    <div>
+                                        <span class="text-[10px] text-slate-400 uppercase font-bold block">Valor Aluguel</span>
+                                        <span class="text-lg font-black text-blue-700">R$ {{ item.preco_aluguel|intcomma }}/mês</span>
+                                    </div>
+                                {% endif %}
+
+                                {% if item.preco_novo_referencia and item.preco_usado and item.preco_novo_referencia > item.preco_usado %}
+                                    <span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200">
+                                        Novo: R$ {{ item.preco_novo_referencia|intcomma }}
+                                    </span>
+                                {% endif %}
+                            </div>
+
+                            <a href="{% url 'core:item_detail' item.slug %}"
+                                class="w-full py-2 bg-slate-100 group-hover:bg-emerald-600 group-hover:text-white text-slate-700 font-bold text-xs rounded-xl transition-all text-center flex items-center justify-center gap-1">
+                                <span>Ver Detalhes & Contato</span>
+                                <span>→</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center text-slate-500 space-y-3">
+            <div class="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto text-slate-400 text-xl">
+                🔍
+            </div>
+            <h3 class="font-bold text-slate-800 text-base">Nenhum item encontrado</h3>
+            <p class="text-xs text-slate-500 max-w-sm mx-auto">Não há itens disponíveis com os filtros selecionados no momento.</p>
+            <a href="/" class="inline-block px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors">
+                Limpar Filtros
+            </a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
