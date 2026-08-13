@@ -40,8 +40,10 @@ sudo chmod -R 775 $APP_DIR/media
 echo "🐍 Criando ambiente virtual Python e instalando dependências..."
 cd $APP_DIR
 sudo -u www-data python3 -m venv $APP_DIR/venv
-sudo -u www-data $APP_DIR/venv/bin/pip install --upgrade pip
 sudo -u www-data $APP_DIR/venv/bin/pip install -r $APP_DIR/requirements.txt
+
+# Correção automática para compatibilidade com Python 3.14+
+sudo find $APP_DIR/venv/lib -name "context.py" -exec sed -i 's/duplicate = copy(super())/duplicate = self.__class__.__new__(self.__class__)/g' {} +
 
 # 6. Criação do arquivo .env se não existir
 if [ ! -f "$APP_DIR/.env" ]; then
