@@ -42,8 +42,15 @@ cd $APP_DIR
 sudo -u www-data python3 -m venv $APP_DIR/venv
 sudo -u www-data $APP_DIR/venv/bin/pip install -r $APP_DIR/requirements.txt
 
-# Correção automática para compatibilidade com Python 3.14+
-sudo find $APP_DIR/venv/lib -name "context.py" -exec sed -i 's/duplicate = copy(super())/duplicate = self.__class__.__new__(self.__class__)/g' {} +
+# Correção para compatibilidade com Python 3.14+ (copia atributos de RequestContext)
+sudo $APP_DIR/venv/bin/python -c "
+import glob
+for p in glob.glob('$APP_DIR/venv/lib/python3.*/site-packages/django/template/context.py'):
+    with open(p) as f: c = f.read()
+    c = c.replace('duplicate = copy(super())', 'duplicate = self.__class__.__new__(self.__class__)\n        duplicate.__dict__.update(self.__dict__)')
+    c = c.replace('duplicate = self.__class__.__new__(self.__class__)\n        duplicate.dicts', 'duplicate = self.__class__.__new__(self.__class__)\n        duplicate.__dict__.update(self.__dict__)\n        duplicate.dicts')
+    with open(p, 'w') as f: f.write(c)
+"
 
 # 6. Criação do arquivo .env se não existir
 if [ ! -f "$APP_DIR/.env" ]; then
