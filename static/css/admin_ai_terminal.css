@@ -1,32 +1,35 @@
 /* ==========================================================================
-   Admin AI Pipeline Terminal - Hub de Desapego
-   Terminal interativo, direto na página, não-bloqueante e com visual Dev/CLI.
+   Admin Minimal Hacker Terminal - Hub de Desapego
+   Terminal clean, sem box pesado, movível (drag & drop), estilo hacker/CLI.
    ========================================================================== */
 
-/* 1. Terminal Root Window */
+/* 1. Movable Minimal Floating Terminal */
 #admin-ai-terminal-root {
     position: fixed;
-    bottom: 24px;
-    right: 24px;
-    width: 640px;
-    max-width: calc(100vw - 32px);
-    height: 380px;
-    max-height: calc(100vh - 48px);
-    background: #090d16;
-    border: 1px solid #1e293b;
-    border-radius: 12px;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    bottom: 20px;
+    right: 20px;
+    width: 480px;
+    max-width: calc(100vw - 30px);
+    min-width: 320px;
+    height: 280px;
+    min-height: 160px;
+    max-height: calc(100vh - 40px);
+    background: rgba(11, 15, 25, 0.94);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(16, 185, 129, 0.12);
     z-index: 99999;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", "Fira Code", monospace;
-    font-size: 12px;
+    font-family: ui-monospace, "SF Mono", "JetBrains Mono", "Fira Code", Consolas, Menlo, monospace;
+    font-size: 11.5px;
     line-height: 1.5;
-    color: #e2e8f0;
-    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s ease;
+    color: #cbd5e1;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
+    resize: both;
+    transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
 #admin-ai-terminal-root.terminal-hidden {
@@ -34,359 +37,275 @@
 }
 
 #admin-ai-terminal-root.terminal-minimized {
-    transform: translateY(20px) scale(0.92);
-    opacity: 0;
-    pointer-events: none;
     display: none !important;
 }
 
-#admin-ai-terminal-root.terminal-maximized {
-    width: calc(100vw - 48px);
-    height: calc(100vh - 48px);
-    max-width: 100vw;
-    max-height: 100vh;
+#admin-ai-terminal-root.is-dragging {
+    opacity: 0.88;
+    user-select: none;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(16, 185, 129, 0.3);
+    cursor: grabbing;
 }
 
-/* 2. Terminal Header Bar */
+/* 2. Minimalist Header & Drag Handle */
 .ai-terminal-header {
-    background: #0f172a;
-    border-bottom: 1px solid #1e293b;
-    padding: 8px 14px;
+    background: rgba(15, 23, 42, 0.7);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 6px 12px;
     display: flex;
     align-items: center;
     justify-content: space-between;
+    cursor: grab;
     user-select: none;
     -webkit-user-select: none;
 }
 
-.ai-terminal-window-dots {
+.ai-terminal-drag-label {
     display: flex;
     align-items: center;
     gap: 7px;
-}
-
-.ai-terminal-dot {
-    width: 11px;
-    height: 11px;
-    border-radius: 50%;
-    cursor: pointer;
-    transition: transform 0.15s ease, opacity 0.15s ease;
-    display: inline-block;
-}
-
-.ai-terminal-dot:hover {
-    transform: scale(1.15);
-}
-
-.ai-terminal-dot.dot-close {
-    background: #ef4444;
-    border: 1px solid #dc2626;
-}
-
-.ai-terminal-dot.dot-minimize {
-    background: #eab308;
-    border: 1px solid #ca8a04;
-}
-
-.ai-terminal-dot.dot-maximize {
-    background: #22c55e;
-    border: 1px solid #16a34a;
-}
-
-.ai-terminal-title {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: #94a3b8;
+    color: #10b981;
     font-size: 11px;
     font-weight: 600;
-    letter-spacing: 0.2px;
-}
-
-.ai-terminal-title .terminal-host {
-    color: #c084fc;
-}
-
-.ai-terminal-header-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-/* Status Badges */
-.ai-terminal-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 10px;
-    font-weight: 700;
-    padding: 2px 7px;
-    border-radius: 9999px;
     letter-spacing: 0.3px;
-    text-transform: uppercase;
 }
 
-.ai-terminal-badge.status-idle {
-    background: rgba(100, 116, 139, 0.2);
+.ai-terminal-drag-label .grip-icon {
+    color: #475569;
+    font-size: 12px;
+    cursor: grab;
+}
+
+.ai-terminal-drag-label .terminal-name {
     color: #94a3b8;
-    border: 1px solid rgba(100, 116, 139, 0.3);
 }
 
-.ai-terminal-badge.status-running {
-    background: rgba(147, 51, 234, 0.2);
-    color: #c084fc;
-    border: 1px solid rgba(147, 51, 234, 0.4);
-}
-
-.ai-terminal-badge.status-running .badge-dot {
+.ai-terminal-drag-label .terminal-status-dot {
     width: 6px;
     height: 6px;
     border-radius: 50%;
+    background: #10b981;
+    display: inline-block;
+}
+
+.ai-terminal-drag-label .terminal-status-dot.is-running {
     background: #a855f7;
-    animation: terminal-pulse 1.2s infinite ease-in-out;
+    animation: hacker-pulse 1s infinite alternate ease-in-out;
 }
 
-.ai-terminal-badge.status-done {
-    background: rgba(16, 185, 129, 0.2);
-    color: #34d399;
-    border: 1px solid rgba(16, 185, 129, 0.4);
+.ai-terminal-drag-label .terminal-status-dot.is-error {
+    background: #ef4444;
 }
 
-.ai-terminal-badge.status-error {
-    background: rgba(239, 68, 68, 0.2);
-    color: #f87171;
-    border: 1px solid rgba(239, 68, 68, 0.4);
+/* Clean text-based actions */
+.ai-terminal-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
-.ai-terminal-btn-tool {
+.ai-terminal-action-btn {
     background: transparent;
-    border: 1px solid #334155;
-    color: #94a3b8;
-    border-radius: 4px;
-    padding: 2px 7px;
-    font-size: 10px;
+    border: none;
+    color: #64748b;
     font-family: inherit;
+    font-size: 11px;
     cursor: pointer;
-    transition: all 0.15s ease;
+    padding: 2px 4px;
+    line-height: 1;
+    border-radius: 3px;
+    transition: color 0.15s ease, background 0.15s ease;
 }
 
-.ai-terminal-btn-tool:hover {
-    background: #1e293b;
+.ai-terminal-action-btn:hover {
     color: #f1f5f9;
-    border-color: #475569;
+    background: rgba(255, 255, 255, 0.06);
 }
 
-/* 3. Terminal Body Console */
+.ai-terminal-action-btn.btn-close:hover {
+    color: #ef4444;
+}
+
+/* 3. Log Stream Body */
 .ai-terminal-body {
     flex: 1;
     overflow-y: auto;
-    padding: 12px 14px;
-    background: #070a12;
+    padding: 8px 12px;
+    background: transparent;
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 3px;
     scroll-behavior: smooth;
 }
 
-/* Custom dark scrollbar */
+/* Minimal Scrollbar */
 .ai-terminal-body::-webkit-scrollbar {
-    width: 6px;
+    width: 4px;
+    height: 4px;
 }
 
 .ai-terminal-body::-webkit-scrollbar-track {
-    background: #070a12;
+    background: transparent;
 }
 
 .ai-terminal-body::-webkit-scrollbar-thumb {
-    background: #1e293b;
-    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
 }
 
 .ai-terminal-body::-webkit-scrollbar-thumb:hover {
-    background: #334155;
+    background: rgba(255, 255, 255, 0.2);
 }
 
-/* 4. Terminal Log Lines */
-.terminal-line {
+/* 4. Stream Log Lines */
+.term-row {
     display: flex;
-    align-items: flex-start;
-    gap: 8px;
+    align-items: baseline;
+    gap: 6px;
+    line-height: 1.45;
     word-break: break-word;
 }
 
-.terminal-time {
+.term-time {
     color: #475569;
-    font-size: 11px;
+    font-size: 10px;
     user-select: none;
     white-space: nowrap;
 }
 
-.terminal-text {
+.term-sym {
+    color: #10b981;
+    font-weight: 700;
+    user-select: none;
+}
+
+.term-sym.sym-proc {
+    color: #a855f7;
+}
+
+.term-sym.sym-err {
+    color: #ef4444;
+}
+
+.term-sym.sym-info {
+    color: #38bdf8;
+}
+
+.term-text {
     flex: 1;
     color: #cbd5e1;
 }
 
-.terminal-command {
-    color: #a78bfa;
-    font-weight: 700;
-}
-
-.terminal-prompt {
-    color: #38bdf8;
-    user-select: none;
-}
-
-/* Tags */
-.terminal-tag {
-    font-weight: 700;
-    padding: 1px 5px;
-    border-radius: 3px;
-    font-size: 10px;
-    letter-spacing: 0.3px;
-    display: inline-block;
-    margin-right: 4px;
-}
-
-.terminal-tag.tag-init { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
-.terminal-tag.tag-vision { background: rgba(192, 132, 252, 0.15); color: #c084fc; border: 1px solid rgba(192, 132, 252, 0.3); }
-.terminal-tag.tag-market { background: rgba(250, 204, 21, 0.15); color: #facc15; border: 1px solid rgba(250, 204, 21, 0.3); }
-.terminal-tag.tag-copy { background: rgba(74, 222, 128, 0.15); color: #4ade80; border: 1px solid rgba(74, 222, 128, 0.3); }
-.terminal-tag.tag-db { background: rgba(96, 165, 250, 0.15); color: #60a5fa; border: 1px solid rgba(96, 165, 250, 0.3); }
-.terminal-tag.tag-success { background: rgba(52, 211, 153, 0.2); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.4); }
-.terminal-tag.tag-error { background: rgba(248, 113, 113, 0.2); color: #f87171; border: 1px solid rgba(248, 113, 113, 0.4); }
-.terminal-tag.tag-batch { background: rgba(168, 85, 247, 0.15); color: #a855f7; border: 1px solid rgba(168, 85, 247, 0.3); }
-
-.terminal-detail {
-    color: #94a3b8;
-    margin-left: 20px;
-    font-size: 11px;
-    border-left: 2px solid #1e293b;
-    padding-left: 8px;
-    margin-top: 2px;
-    margin-bottom: 2px;
-}
-
-.terminal-summary-card {
-    background: #0f172a;
-    border: 1px solid #334155;
-    border-left: 3px solid #34d399;
-    border-radius: 6px;
-    padding: 8px 12px;
-    margin: 6px 0 6px 20px;
-    font-size: 11px;
-    color: #cbd5e1;
-}
-
-.terminal-summary-card .summary-title {
-    font-weight: 700;
+.term-highlight {
     color: #f1f5f9;
-    margin-bottom: 4px;
+    font-weight: 600;
 }
 
-.terminal-summary-card .summary-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 4px 10px;
-}
-
-.terminal-summary-card .summary-item {
+.term-sub {
     color: #94a3b8;
+    margin-left: 14px;
+    font-size: 11px;
 }
 
-.terminal-summary-card .summary-item strong {
+.term-success {
+    color: #34d399;
+}
+
+.term-error {
+    color: #f87171;
+}
+
+.term-accent {
     color: #38bdf8;
 }
 
-/* Blinking terminal cursor */
-.terminal-cursor {
+/* Blinking Cursor */
+.term-cursor {
     display: inline-block;
-    width: 7px;
-    height: 13px;
-    background: #34d399;
-    vertical-align: middle;
-    margin-left: 3px;
-    animation: terminal-blink 1s infinite steps(2, start);
+    color: #10b981;
+    font-weight: 700;
+    animation: hacker-blink 0.9s infinite steps(2, start);
 }
 
-@keyframes terminal-blink {
+@keyframes hacker-blink {
     0%, 100% { opacity: 1; }
     50% { opacity: 0; }
 }
 
-@keyframes terminal-pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.4; transform: scale(0.85); }
+@keyframes hacker-pulse {
+    0% { opacity: 0.4; transform: scale(0.85); }
+    100% { opacity: 1; transform: scale(1.15); }
 }
 
-/* 5. Minimized Floating Pill */
+/* 5. Minimalist Floating Chip (when minimized) */
 #admin-ai-terminal-pill {
     position: fixed;
-    bottom: 20px;
-    right: 20px;
-    background: rgba(9, 13, 22, 0.95);
-    border: 1px solid #334155;
-    border-radius: 9999px;
-    padding: 7px 16px;
+    bottom: 16px;
+    right: 16px;
+    background: rgba(11, 15, 25, 0.9);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    border-radius: 6px;
+    padding: 5px 10px;
     display: inline-flex;
     align-items: center;
-    gap: 9px;
-    color: #f1f5f9;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    gap: 7px;
+    color: #cbd5e1;
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
     font-size: 11px;
-    font-weight: 600;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08);
     cursor: pointer;
     z-index: 99998;
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
     backdrop-filter: blur(8px);
+    transition: all 0.15s ease;
 }
 
 #admin-ai-terminal-pill:hover {
-    background: #0f172a;
-    border-color: #9333ea;
-    transform: translateY(-2px);
-    box-shadow: 0 12px 28px -5px rgba(147, 51, 234, 0.35);
+    border-color: #10b981;
+    color: #f1f5f9;
+    transform: translateY(-1px);
 }
 
 #admin-ai-terminal-pill.pill-hidden {
     display: none !important;
 }
 
-#admin-ai-terminal-pill .pill-pulse {
-    width: 8px;
-    height: 8px;
+#admin-ai-terminal-pill .pill-dot {
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
-    background: #a855f7;
-    animation: terminal-pulse 1.2s infinite ease-in-out;
+    background: #10b981;
 }
 
-/* 6. Active AI Action Button Animation */
+#admin-ai-terminal-pill .pill-dot.is-running {
+    background: #a855f7;
+    animation: hacker-pulse 1s infinite alternate ease-in-out;
+}
+
+/* 6. Subtle Sparkle Button Spinning State */
 .admin-ai-action-btn.is-running {
-    color: #9333ea !important;
+    color: #10b981 !important;
     pointer-events: none;
 }
 
 .admin-ai-action-btn.is-running svg {
-    animation: terminal-spin 0.8s linear infinite !important;
+    animation: term-spin 0.7s linear infinite !important;
 }
 
-@keyframes terminal-spin {
+@keyframes term-spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
 }
 
-/* 7. Table Row Live Update Glow Effect */
+/* 7. Row Update Flash Animation */
 tr.row-ai-updated {
-    animation: row-update-glow 2.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation: row-glow-flash 2.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-@keyframes row-update-glow {
+@keyframes row-glow-flash {
     0% {
-        background-color: rgba(16, 185, 129, 0.35) !important;
-        box-shadow: inset 0 0 0 2px rgba(16, 185, 129, 0.6);
+        background-color: rgba(16, 185, 129, 0.22) !important;
     }
     100% {
         background-color: transparent !important;
-        box-shadow: inset 0 0 0 0 transparent;
     }
 }
