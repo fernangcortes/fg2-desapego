@@ -48,6 +48,9 @@ class ItemAdmin(admin.ModelAdmin):
     readonly_fields = ('criado_em', 'atualizado_em', 'urls_referencia_formatadas')
     list_per_page = 25
 
+    class Media:
+        js = ('js/admin_ai_loading.js',)
+
     fieldsets = (
         ("Informações Principais", {
             'fields': (

@@ -36,6 +36,9 @@
     </script>
     <!-- HTMX CDN -->
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    
+    <!-- AI Feedback & Animations -->
+    <link rel="stylesheet" href="/static/css/ai-feedback.css">
     {% block extra_head %}{% endblock %}
 </head>
 <body class="h-full flex flex-col antialiased pb-20 sm:pb-0">
@@ -112,6 +115,8 @@
             });
         }
     </script>
+    <!-- AI Feedback & Interactive UI Engine -->
+    <script src="/static/js/ai-feedback.js"></script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

@@ -16,11 +16,17 @@
         </nav>
         {% if user.is_staff %}
             <div class="flex items-center gap-2">
+                <button type="button"
+                    data-ai-process="{{ item.id }}"
+                    data-ai-redirect="."
+                    class="px-2.5 py-1 bg-purple-100 text-purple-800 hover:bg-purple-200 rounded-lg font-bold transition-all flex items-center gap-1 active:scale-95">
+                    <span>✨ Reprocessar IA</span>
+                </button>
                 <a href="{% url 'marketplace:export_modal' item.id %}" class="px-2.5 py-1 bg-emerald-100 text-emerald-800 hover:bg-emerald-200 rounded-lg font-bold transition-colors">
                     📋 Exportar Anúncio
                 </a>
-                <a href="/admin/core/item/{{ item.id }}/change/" class="px-2.5 py-1 bg-purple-100 text-purple-800 hover:bg-purple-200 rounded-lg font-bold transition-colors">
-                    ⚙️ Editar no Admin
+                <a href="/admin/core/item/{{ item.id }}/change/" class="px-2.5 py-1 bg-slate-100 text-slate-800 hover:bg-slate-200 rounded-lg font-bold transition-colors">
+                    ⚙️ Admin
                 </a>
             </div>
         {% endif %}
@@ -132,9 +138,9 @@
                         <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-200 space-y-1.5">
                             <div class="flex items-center justify-between">
                                 <span class="text-[11px] font-bold text-emerald-950">Chave PIX do Vendedor</span>
-                                <button onclick="navigator.clipboard.writeText('{{ configuracao.chave_pix }}'); alert('Chave PIX copiada!');"
-                                    class="text-[10px] bg-emerald-600 text-white px-2 py-0.5 rounded font-bold hover:bg-emerald-700 transition-colors">
-                                    Copiar PIX
+                                <button onclick="AIFeedback.copyTextToClipboard('{{ configuracao.chave_pix|escapejs }}', this);"
+                                    class="text-[10px] bg-emerald-600 text-white px-2 py-0.5 rounded font-bold hover:bg-emerald-700 transition-all active:scale-95 flex items-center gap-1">
+                                    <span>Copiar PIX</span>
                                 </button>
                             </div>
                             <p class="font-mono text-xs text-emerald-800 break-all select-all">{{ configuracao.chave_pix }}</p>

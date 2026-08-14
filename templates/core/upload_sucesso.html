@@ -40,18 +40,24 @@
     </div>
 
     <!-- Card de Ação da IA -->
-    <div class="p-4 bg-purple-50 rounded-2xl border border-purple-200 text-left space-y-3">
-        <div class="flex items-start gap-2">
-            <span class="text-xl">✨</span>
+    <div class="p-4 bg-gradient-to-br from-purple-50 to-indigo-50/60 rounded-2xl border border-purple-200 text-left space-y-3 shadow-sm">
+        <div class="flex items-start gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center font-bold text-sm shadow-sm flex-shrink-0">
+                ✨
+            </div>
             <div class="text-xs text-purple-950 leading-relaxed">
-                <strong>Orquestrador de IA pronto:</strong><br>
-                Execute a análise de visão computacional, pesquisa de preços e copywriting agora ou faça em lote pelo painel.
+                <strong class="font-bold text-purple-900">Pipeline de IA Pronto para Execução:</strong><br>
+                Identificação por visão computacional, pesquisa de mercado de novos/usados e copywriting transparente.
             </div>
         </div>
-        <a href="{% url 'ai_engine:process_item' item.id %}"
-            class="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center justify-center gap-1.5 active:scale-[0.98]">
-            <span>🤖 Executar IA no Item Agora</span>
-        </a>
+        <button type="button"
+            data-ai-process="{{ item.id }}"
+            data-ai-redirect="/admin/core/item/{{ item.id }}/change/"
+            class="w-full py-3 bg-purple-600 hover:bg-purple-700 active:scale-[0.98] text-white font-bold text-xs rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 group">
+            <span class="group-hover:rotate-12 transition-transform">🤖</span>
+            <span>Executar IA no Item Agora</span>
+            <span class="text-purple-200 text-[11px]">→</span>
+        </button>
     </div>
 
     <!-- Botões de Ação -->

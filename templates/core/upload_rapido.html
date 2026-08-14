@@ -134,19 +134,30 @@
         <div>
             <button type="submit" id="submitBtn" disabled
                 class="w-full py-4 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-black text-base rounded-2xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 active:scale-[0.98]">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg id="submitBtnIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
                 </svg>
-                <span>Salvar Rascunho do Item</span>
+                <span id="submitBtnSpinner" class="btn-spinner hidden"></span>
+                <span id="submitBtnText">Salvar Rascunho do Item</span>
             </button>
         </div>
     </form>
 
-    <!-- Overlay de Loading / Envio -->
-    <div id="loadingOverlay" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-white hidden">
-        <div class="w-16 h-16 border-4 border-emerald-400 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <h3 class="text-xl font-bold">Enviando fotos...</h3>
-        <p class="text-sm text-slate-300 mt-1">Registrando item no sistema de desapego</p>
+    <!-- Overlay de Loading / Envio Moderno -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden transition-opacity duration-300">
+        <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center shadow-2xl border border-slate-100 animate-bounce-subtle">
+            <div class="relative w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                <div class="absolute inset-0 rounded-full border-4 border-emerald-100"></div>
+                <div class="absolute inset-0 rounded-full border-4 border-emerald-600 border-t-transparent animate-spin"></div>
+                <span class="text-2xl">📸</span>
+            </div>
+            <h3 class="text-lg font-black text-slate-900" id="uploadLoadingTitle">Enviando fotos do item...</h3>
+            <p class="text-xs text-slate-500 mt-1" id="uploadLoadingSubtitle">Registrando fotos e organizando a galeria de desapego...</p>
+            
+            <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden mt-4">
+                <div class="h-full bg-emerald-600 rounded-full animated-stripes w-full"></div>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -262,7 +273,21 @@
             alert('Por favor, adicione pelo menos uma foto.');
             return;
         }
+
+        // Feedback imediato no botão
+        submitBtn.disabled = true;
+        document.getElementById('submitBtnIcon').classList.add('hidden');
+        document.getElementById('submitBtnSpinner').classList.remove('hidden');
+        document.getElementById('submitBtnText').textContent = 'Enviando fotos...';
+
+        // Mostra o overlay animado
         loadingOverlay.classList.remove('hidden');
+
+        // Simula rotação de mensagens amigáveis
+        setTimeout(() => {
+            const subtitle = document.getElementById('uploadLoadingSubtitle');
+            if (subtitle) subtitle.textContent = 'Quase pronto! Gravando imagens no servidor...';
+        }, 1500);
     });
 </script>
 {% endblock %}

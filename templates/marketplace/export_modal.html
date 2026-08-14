@@ -54,7 +54,7 @@
             <div id="tab-content-olx" class="tab-content space-y-3">
                 <div class="flex items-center justify-between">
                     <p class="text-xs text-slate-500">Formatado para o campo de descrição da <strong>OLX</strong> (sem markdown quebrado).</p>
-                    <button onclick="copyToClipboard('olxTextarea', 'copiedBadgeOlx')"
+                    <button onclick="copyFieldContent('olxTextarea', this)"
                         class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center gap-1.5 active:scale-95">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -63,15 +63,14 @@
                     </button>
                 </div>
                 <textarea id="olxTextarea" rows="12" readonly
-                    class="w-full p-4 bg-slate-50 border border-slate-300 rounded-xl font-mono text-xs text-slate-800 focus:outline-none">{{ olx_text }}</textarea>
-                <div id="copiedBadgeOlx" class="hidden text-xs font-bold text-emerald-600 animate-pulse">✓ Descrição da OLX copiada com sucesso para a área de transferência!</div>
+                    class="w-full p-4 bg-slate-50 border border-slate-300 rounded-xl font-mono text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500">{{ olx_text }}</textarea>
             </div>
 
             <!-- Aba Mercado Livre -->
             <div id="tab-content-ml" class="tab-content hidden space-y-3">
                 <div class="flex items-center justify-between">
                     <p class="text-xs text-slate-500">Estruturado para a descrição do <strong>Mercado Livre</strong>.</p>
-                    <button onclick="copyToClipboard('mlTextarea', 'copiedBadgeMl')"
+                    <button onclick="copyFieldContent('mlTextarea', this)"
                         class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold rounded-xl shadow-sm transition-all flex items-center gap-1.5 active:scale-95">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -80,15 +79,14 @@
                     </button>
                 </div>
                 <textarea id="mlTextarea" rows="12" readonly
-                    class="w-full p-4 bg-slate-50 border border-slate-300 rounded-xl font-mono text-xs text-slate-800 focus:outline-none">{{ ml_text }}</textarea>
-                <div id="copiedBadgeMl" class="hidden text-xs font-bold text-amber-600 animate-pulse">✓ Descrição do Mercado Livre copiada!</div>
+                    class="w-full p-4 bg-slate-50 border border-slate-300 rounded-xl font-mono text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500">{{ ml_text }}</textarea>
             </div>
 
             <!-- Aba Facebook -->
             <div id="tab-content-fb" class="tab-content hidden space-y-3">
                 <div class="flex items-center justify-between">
                     <p class="text-xs text-slate-500">Texto direto e compacto para <strong>Facebook Marketplace</strong> e grupos.</p>
-                    <button onclick="copyToClipboard('fbTextarea', 'copiedBadgeFb')"
+                    <button onclick="copyFieldContent('fbTextarea', this)"
                         class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center gap-1.5 active:scale-95">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -97,21 +95,20 @@
                     </button>
                 </div>
                 <textarea id="fbTextarea" rows="10" readonly
-                    class="w-full p-4 bg-slate-50 border border-slate-300 rounded-xl font-mono text-xs text-slate-800 focus:outline-none">{{ fb_text }}</textarea>
-                <div id="copiedBadgeFb" class="hidden text-xs font-bold text-blue-600 animate-pulse">✓ Texto do Facebook copiado!</div>
+                    class="w-full p-4 bg-slate-50 border border-slate-300 rounded-xl font-mono text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500">{{ fb_text }}</textarea>
             </div>
 
             <!-- Aba WhatsApp & Link Direto -->
             <div id="tab-content-wa" class="tab-content hidden space-y-6">
                 <div class="p-4 bg-emerald-50 rounded-xl border border-emerald-200 space-y-3">
                     <h3 class="font-bold text-emerald-950 text-sm">Mensagem Padrão de Cotação WhatsApp</h3>
-                    <p class="text-xs text-emerald-800 font-mono p-3 bg-white rounded-lg border border-emerald-200">
+                    <p class="text-xs text-emerald-800 font-mono p-3 bg-white rounded-lg border border-emerald-200 select-all" id="waMessageBlock">
                         {{ wa_data.mensagem }}
                     </p>
                     <div class="flex gap-2">
-                        <button onclick="navigator.clipboard.writeText('{{ wa_data.mensagem|escapejs }}'); alert('Mensagem copiada!');"
-                            class="px-3 py-1.5 bg-emerald-700 text-white text-xs font-bold rounded-lg hover:bg-emerald-800 transition-colors">
-                            Copiar Texto
+                        <button onclick="AIFeedback.copyTextToClipboard('{{ wa_data.mensagem|escapejs }}', this);"
+                            class="px-3 py-1.5 bg-emerald-700 text-white text-xs font-bold rounded-lg hover:bg-emerald-800 transition-all flex items-center gap-1 active:scale-95">
+                            <span>Copiar Texto</span>
                         </button>
                         <a href="{{ wa_data.whatsapp_url }}" target="_blank"
                             class="px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 transition-colors">
@@ -125,12 +122,11 @@
                     <div class="flex gap-2">
                         <input type="text" id="directLinkInput" value="{{ direct_link }}" readonly
                             class="flex-1 px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono">
-                        <button onclick="copyToClipboard('directLinkInput', 'copiedBadgeLink')"
-                            class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-lg transition-colors">
-                            Copiar Link
+                        <button onclick="copyFieldContent('directLinkInput', this)"
+                            class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1 active:scale-95">
+                            <span>Copiar Link</span>
                         </button>
                     </div>
-                    <div id="copiedBadgeLink" class="hidden text-xs font-bold text-emerald-600 animate-pulse">✓ Link direto copiado!</div>
                 </div>
             </div>
         </div>
@@ -157,16 +153,12 @@
         }
     }
 
-    function copyToClipboard(elementId, badgeId) {
+    function copyFieldContent(elementId, btnElement) {
         const el = document.getElementById(elementId);
         if (el) {
             el.select();
-            navigator.clipboard.writeText(el.value);
-            if (badgeId) {
-                const badge = document.getElementById(badgeId);
-                badge.classList.remove('hidden');
-                setTimeout(() => badge.classList.add('hidden'), 3500);
-            }
+            const textToCopy = el.value || el.textContent;
+            AIFeedback.copyTextToClipboard(textToCopy, btnElement);
         }
     }
 </script>
