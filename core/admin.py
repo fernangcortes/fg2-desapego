@@ -51,13 +51,13 @@ class ItemAdmin(admin.ModelAdmin):
     class Media:
         css = {
             'all': (
-                'css/admin_subtle_actions.css?v=2.8',
-                'css/admin_ai_terminal.css?v=2.8',
+                'css/admin_subtle_actions.css',
+                'css/admin_ai_terminal.css',
             )
         }
         js = (
-            'js/admin_ai_terminal.js?v=2.8',
-            'js/admin_subtle_actions.js?v=2.8',
+            'js/admin_ai_terminal.js',
+            'js/admin_subtle_actions.js',
         )
 
 
@@ -144,16 +144,16 @@ class ItemAdmin(admin.ModelAdmin):
         export_url = reverse('marketplace:export_modal', args=[obj.pk])
         delete_url = reverse('core:quick_delete_item', args=[obj.pk])
         return format_html(
-            '<div class="admin-subtle-actions">'
-            '<a href="{}" class="admin-subtle-btn admin-ai-action-btn" data-item-id="{}" data-item-title="{}" title="Processar com IA">'
-            '<svg viewBox="0 0 24 24"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/><path d="M5 3v4"/><path d="M19 17v4"/></svg>'
+            '<div class="admin-subtle-actions" style="display:inline-flex; align-items:center; gap:8px;">'
+            '<a href="{}" class="admin-subtle-btn admin-ai-action-btn" data-item-id="{}" data-item-title="{}" title="Processar com IA" style="display:inline-flex; width:18px; height:18px;">'
+            '<svg viewBox="0 0 24 24" style="width:17px; height:17px; min-width:17px; stroke:currentColor; fill:none; stroke-width:1.8;"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/><path d="M5 3v4"/><path d="M19 17v4"/></svg>'
             '</a>'
-            '<a href="{}" class="admin-subtle-btn admin-export-action-btn" title="Exportar Anúncio">'
-            '<svg viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>'
+            '<a href="{}" class="admin-subtle-btn admin-export-action-btn" title="Exportar Anúncio" style="display:inline-flex; width:18px; height:18px;">'
+            '<svg viewBox="0 0 24 24" style="width:17px; height:17px; min-width:17px; stroke:currentColor; fill:none; stroke-width:1.8;"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>'
             '</a>'
             '<button type="button" class="admin-subtle-btn admin-delete-action-btn" '
-            'data-item-id="{}" data-item-title="{}" data-delete-url="{}" title="Excluir este item">'
-            '<svg viewBox="0 0 24 24">'
+            'data-item-id="{}" data-item-title="{}" data-delete-url="{}" title="Excluir este item" style="display:inline-flex; align-items:center; background:none; border:none; padding:0; cursor:pointer;">'
+            '<svg viewBox="0 0 24 24" style="width:17px; height:17px; min-width:17px; stroke:currentColor; fill:none; stroke-width:1.8;">'
             '<path class="trash-lid" d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>'
             '<path class="trash-body" d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0v10m4-10v10m4-10v10"/>'
             '</svg>'
