@@ -435,6 +435,9 @@
                     const links = data.num_urls || (data.urls_referencia ? data.urls_referencia.length : 0);
 
                     this.log(`synced: <span class="term-highlight">"${data.titulo || itemTitle}"</span>`, 'ok', true);
+                    if (data.slug) {
+                        this.log(`slug: <span class="term-accent">/item/${data.slug}/</span>`, 'info', true);
+                    }
                     this.log(`venda: <span class="term-accent">${precoUsado}</span> | novo: ${precoNovo} | links: ${links}`, 'ok', true);
 
                     this.updateTableRow(itemId, data);
@@ -546,6 +549,7 @@
             };
 
             setVal('id_titulo', data.titulo);
+            setVal('id_slug', data.slug);
             setVal('id_preco_usado', data.preco_usado);
             setVal('id_preco_novo_referencia', data.preco_novo_referencia);
             setVal('id_preco_aluguel', data.preco_aluguel);

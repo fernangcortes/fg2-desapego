@@ -7,6 +7,7 @@ import urllib.parse
 from typing import Dict, Any, List, Optional
 import requests
 from django.conf import settings
+from django.utils.text import slugify
 from core.models import Item, ImagemItem
 
 logger = logging.getLogger(__name__)
@@ -440,6 +441,7 @@ class CopywritingService:
             "Retorne a resposta ESTRITAMENTE em formato JSON com o seguinte schema:\n"
             "{\n"
             '  "titulo": "Título objetivo e atrativo com marca, modelo e atributo principal (max 70 chars)",\n'
+            '  "slug": "Slug amigável, simples, curto e limpo em minúsculas com hífens baseado no produto, marca e modelo (ex: \'fone-sennheiser-hd-400s\', \'camera-sony-a6400\', \'violao-yamaha-c40\')",\n'
             '  "descricao": "Texto completo da descrição seguindo a estrutura de tópicos acima",\n'
             '  "preco_usado": 0.00,\n'
             '  "preco_novo": 0.00,\n'
@@ -489,7 +491,7 @@ class CopywritingService:
             "- 🎁 Itens Inclusos\n"
             "- 🚚 Condições de Retirada & Envio\n\n"
             "Retorne ESTRITAMENTE em formato JSON com as chaves:\n"
-            "titulo (string até 70 chars), descricao (string completa), preco_usado (float), preco_novo (float), preco_aluguel (float)."
+            "titulo (string até 70 chars), slug (slug amigável curto em minúsculas com hífens como 'fone-sennheiser-hd-400s'), descricao (string completa), preco_usado (float), preco_novo (float), preco_aluguel (float)."
         )
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
@@ -548,11 +550,23 @@ class CopywritingService:
             f"💬 *Fique à vontade para tirar dúvidas e negociar através dos nossos canais de contato!*"
         )
 
-        titulo_parts = [p for p in [prod, marca, modelo] if p and p.lower() not in ['genérica / não identificada', 'padrão']]
-        titulo = " ".join(titulo_parts)[:70] if titulo_parts else f"{prod} - {marca}".strip(" -")
+        # Monta título limpo sem redundâncias
+        titulo_parts = []
+        if prod and prod.lower() not in ['genérica / não identificada', 'padrão', 'item avaliado', 'item em análise', 'produto em desapego']:
+            titulo_parts.append(prod)
+        if marca and marca.lower() not in ['genérica / não identificada', 'padrão', 'outros', 'desconhecido', 'desconhecida'] and marca.lower() not in prod.lower():
+            titulo_parts.append(marca)
+        if modelo and modelo.lower() not in ['genérica / não identificada', 'padrão', 'outros', 'desconhecido', 'desconhecida'] and modelo.lower() not in prod.lower():
+            titulo_parts.append(modelo)
+
+        titulo = " ".join(titulo_parts)[:70].strip() if titulo_parts else (prod or "Item em Desapego")
+
+        # Gera sugestão de slug limpo e conciso
+        slug_sugerido = slugify(titulo)[:60].strip('-') or "item"
 
         return {
             "titulo": titulo,
+            "slug": slug_sugerido,
             "descricao": descricao,
             "preco_usado": preco_usado,
             "preco_novo": preco_novo,
@@ -629,6 +643,13 @@ class AIOrchestrator:
         if copy_result.get('titulo'):
             item.titulo = copy_result['titulo']
 
+        # Atualização inteligente do slug (URL amigável)
+        suggested_slug = copy_result.get('slug')
+        if suggested_slug:
+            item.slug = item.generate_unique_slug(suggested_slug)
+        elif copy_result.get('titulo') and (not item.slug or item.slug.startswith('item-em-analise')):
+            item.slug = item.generate_unique_slug(copy_result['titulo'])
+
         if copy_result.get('descricao'):
             item.descricao_ia = copy_result['descricao']
 
@@ -668,6 +689,7 @@ class AIOrchestrator:
             "success": True,
             "item_id": item.id,
             "titulo": item.titulo,
+            "slug": item.slug,
             "preco_usado": str(item.preco_usado) if item.preco_usado is not None else None,
             "preco_usado_formatado": format_currency(item.preco_usado),
             "preco_novo_referencia": str(item.preco_novo_referencia) if item.preco_novo_referencia is not None else None,

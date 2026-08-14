@@ -49,6 +49,28 @@ class HubDesapegoCoreTests(TestCase):
         )
         self.assertEqual(item2.slug, "camera-sony-a6400-4k-1")
 
+    def test_item_provisional_slug_auto_update_on_save(self):
+        # Cria item com título provisório de upload rápido
+        item = Item.objects.create(
+            titulo="Item em análise (13/08 às 21:37)",
+            preco_usado=350.00,
+            status=Item.Status.RASCUNHO
+        )
+        self.assertTrue(item.slug.startswith("item-em-analise"))
+
+        # Atualiza título para um produto real e salva
+        item.titulo = "Fone Sennheiser HD 400S"
+        item.save()
+        self.assertEqual(item.slug, "fone-sennheiser-hd-400s")
+
+    def test_generate_unique_slug_custom_text(self):
+        item = Item.objects.create(
+            titulo="Produto Genérico",
+            preco_usado=100.00
+        )
+        custom_slug = item.generate_unique_slug("sennheiser hd-400s p2")
+        self.assertEqual(custom_slug, "sennheiser-hd-400s-p2")
+
     def test_item_descricao_efetiva(self):
         item = Item.objects.create(
             titulo="Monitor Dell 27 4K",

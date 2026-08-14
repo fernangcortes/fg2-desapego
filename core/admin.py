@@ -232,7 +232,11 @@ class ItemAdmin(admin.ModelAdmin):
 
     @admin.action(description="Aprovar itens selecionados (Publicar no Site)")
     def aprovar_itens(self, request, queryset):
-        count = queryset.update(status=Item.Status.APROVADO)
+        count = 0
+        for item in queryset:
+            item.status = Item.Status.APROVADO
+            item.save()
+            count += 1
         self.message_user(request, f"{count} item(ns) aprovado(s) com sucesso.")
 
     @admin.action(description="Marcar itens selecionados como Vendidos")

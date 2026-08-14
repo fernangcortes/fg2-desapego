@@ -183,15 +183,29 @@ class Item(models.Model):
     def __str__(self):
         return f"{self.titulo} [{self.get_status_display()}]"
 
+    def generate_unique_slug(self, base_text: str = None) -> str:
+        """
+        Gera um slug único, limpo e amigável baseado no texto fornecido ou no título do item.
+        """
+        text = base_text or self.titulo or "item"
+        base_slug = slugify(text) or "item"
+        # Limita o comprimento para manter URLs concisas e dentro do limite
+        base_slug = base_slug[:80].rstrip('-')
+        unique_slug = base_slug
+        counter = 1
+        while Item.objects.filter(slug=unique_slug).exclude(pk=self.pk).exists():
+            unique_slug = f"{base_slug}-{counter}"
+            counter += 1
+        return unique_slug
+
     def save(self, *args, **kwargs):
-        if not self.slug:
-            base_slug = slugify(self.titulo) or "item"
-            unique_slug = base_slug
-            counter = 1
-            while Item.objects.filter(slug=unique_slug).exclude(pk=self.pk).exists():
-                unique_slug = f"{base_slug}-{counter}"
-                counter += 1
-            self.slug = unique_slug
+        # Se não tiver slug ou se o slug atual for provisório ("item-em-analise...") e o título já for definitivo
+        is_provisional_slug = bool(self.slug and self.slug.startswith("item-em-analise"))
+        is_provisional_title = bool(self.titulo and self.titulo.lower().startswith("item em análise"))
+
+        if not self.slug or (is_provisional_slug and not is_provisional_title):
+            self.slug = self.generate_unique_slug(self.titulo)
+
         super().save(*args, **kwargs)
 
     @property

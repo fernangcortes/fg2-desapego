@@ -133,6 +133,8 @@ class AIEngineServicesTests(TestCase):
 
         result = CopywritingService._fallback_copywriting(vision_data, market_data, "Cordas novas")
         self.assertIn("Yamaha", result["titulo"])
+        self.assertIn("slug", result)
+        self.assertEqual(result["slug"], "violao-classico-yamaha-c40")
         self.assertIn("Ficha Técnica", result["descricao"])
         self.assertIn("Transparência Total", result["descricao"])
         self.assertIn("Pequeno risco na lateral", result["descricao"])
@@ -141,11 +143,19 @@ class AIEngineServicesTests(TestCase):
         self.assertGreater(result["preco_aluguel"], 0)
 
     def test_ai_orchestrator_end_to_end(self):
+        # Configura item com título provisório de upload rápido
+        self.item.titulo = "Item em análise (13/08 às 21:37)"
+        self.item.slug = "item-em-analise-1308-as-2137"
+        self.item.save()
+
         result = AIOrchestrator.process_item(self.item.id)
         self.assertTrue(result["success"])
+        self.assertIn("slug", result)
 
         # Recarrega do banco
         self.item.refresh_from_db()
+        self.assertFalse(self.item.slug.startswith("item-em-analise"))
+        self.assertEqual(result["slug"], self.item.slug)
         self.assertTrue(bool(self.item.descricao_ia))
         self.assertIn("Ficha Técnica", self.item.descricao_ia)
         self.assertIsNotNone(self.item.preco_usado)
@@ -164,3 +174,4 @@ class AIEngineServicesTests(TestCase):
         self.assertEqual(response_auth.status_code, 200)
         data = response_auth.json()
         self.assertTrue(data.get('success'))
+        self.assertIn('slug', data)
