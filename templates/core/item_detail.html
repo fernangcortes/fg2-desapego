@@ -15,18 +15,33 @@
             <span class="text-slate-800 font-semibold truncate max-w-xs">{{ item.titulo }}</span>
         </nav>
         {% if user.is_staff %}
-            <div class="flex items-center gap-2">
+            <div class="flex items-center flex-wrap gap-2">
                 <button type="button"
                     data-ai-process="{{ item.id }}"
                     data-ai-redirect="."
-                    class="px-2.5 py-1 bg-purple-100 text-purple-800 hover:bg-purple-200 rounded-lg font-bold transition-all flex items-center gap-1 active:scale-95">
-                    <span>✨ Reprocessar IA</span>
+                    class="px-2.5 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 rounded-lg font-bold text-xs transition-all flex items-center gap-1.5 active:scale-95 shadow-sm">
+                    <span>🤖</span>
+                    <span>IA Grátis</span>
                 </button>
-                <a href="{% url 'marketplace:export_modal' item.id %}" class="px-2.5 py-1 bg-emerald-100 text-emerald-800 hover:bg-emerald-200 rounded-lg font-bold transition-colors">
-                    📋 Exportar Anúncio
+                <button type="button"
+                    data-ai-process="{{ item.id }}"
+                    data-ai-serpapi="1"
+                    data-ai-redirect="."
+                    class="px-2.5 py-1.5 bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200 rounded-lg font-bold text-xs transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
+                    title="Executar busca visual reversa profunda com Google Lens (SerpApi)">
+                    <span>🔍</span>
+                    <span>Google Lens Profundo</span>
+                    <span class="serpapi-quota-badge text-[10px] font-mono font-bold bg-amber-200/80 text-amber-900 px-1.5 py-0.5 rounded border border-amber-300">
+                        {{ serpapi_quota.formatted|default:"243/250 rest." }}
+                    </span>
+                </button>
+                <a href="{% url 'marketplace:export_modal' item.id %}" class="px-2.5 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-lg font-bold text-xs transition-colors flex items-center gap-1 shadow-sm">
+                    <span>📋</span>
+                    <span>Exportar</span>
                 </a>
-                <a href="/admin/core/item/{{ item.id }}/change/" class="px-2.5 py-1 bg-slate-100 text-slate-800 hover:bg-slate-200 rounded-lg font-bold transition-colors">
-                    ⚙️ Admin
+                <a href="/admin/core/item/{{ item.id }}/change/" class="px-2.5 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 rounded-lg font-bold text-xs transition-colors flex items-center gap-1 shadow-sm">
+                    <span>⚙️</span>
+                    <span>Admin</span>
                 </a>
             </div>
         {% endif %}

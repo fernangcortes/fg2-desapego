@@ -134,8 +134,9 @@ const AIFeedback = {
             if (aiBtn) {
                 e.preventDefault();
                 const itemId = aiBtn.getAttribute('data-ai-process');
-                const redirectTarget = aiBtn.getAttribute('data-ai-redirect') || `/admin/core/item/${itemId}/change/`;
-                this.processItem(itemId, { redirectUrl: redirectTarget, triggerBtn: aiBtn });
+                const isSerpApi = aiBtn.getAttribute('data-ai-serpapi') === '1';
+                const redirectTarget = aiBtn.getAttribute('data-ai-redirect') || (window.location.pathname.includes('/item/') ? window.location.pathname : `/admin/core/item/${itemId}/change/`);
+                this.processItem(itemId, { redirectUrl: redirectTarget, triggerBtn: aiBtn, useSerpApi: isSerpApi });
             }
 
             // Botões de cópia rápida
@@ -155,7 +156,7 @@ const AIFeedback = {
         if (this.isProcessing) return;
         this.isProcessing = true;
 
-        const { redirectUrl, triggerBtn, autoRedirect = true, onComplete } = options;
+        const { redirectUrl, triggerBtn, autoRedirect = true, onComplete, useSerpApi = false } = options;
 
         if (triggerBtn) {
             triggerBtn.classList.add('btn-loading-state');
@@ -163,9 +164,15 @@ const AIFeedback = {
         }
 
         this.openModal();
+        if (useSerpApi) {
+            const titleEl = document.getElementById('aiModalTitle');
+            const subEl = document.getElementById('aiModalSubtitle');
+            if (titleEl) titleEl.textContent = '🔍 Google Lens Profundo (SerpApi)';
+            if (subEl) subEl.textContent = 'Enviando imagem para busca visual reversa e comparando 50+ lojas...';
+        }
         this.startStepSimulation();
 
-        const endpoint = `/ai/process/${itemId}/?format=json`;
+        const endpoint = useSerpApi ? `/ai/process/${itemId}/?format=json&serpapi=1` : `/ai/process/${itemId}/?format=json`;
 
         fetch(endpoint, {
             method: 'GET',
