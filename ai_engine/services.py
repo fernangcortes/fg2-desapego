@@ -41,13 +41,23 @@ class VisualSearchService:
                 "urls_diretas": []
             }
 
-        # 1. Google Lens Nativo (chrome-lens-py / Chromium Protobuf Engine - Zero chaves, 100% grátis)
+        # 1. SerpApi Google Lens Engine (API Oficial Dedicada do Google Lens)
+        if serpapi_key:
+            try:
+                res = cls._call_serpapi_google_lens(imagens[0].imagem.path, serpapi_key)
+                if res.get('success'):
+                    logger.info(f"SerpApi Google Lens identificou: '{res.get('produto_identificado')}' ({len(res.get('urls_diretas', []))} URLs)")
+                    return res
+            except Exception as e:
+                logger.error(f"Erro no SerpApi Google Lens: {e}")
+
+        # 2. Google Lens Nativo (chrome-lens-py / Chromium Protobuf Engine)
         lens_native_res = cls._call_chrome_lens_native(imagens[0].imagem.path)
         if lens_native_res.get('success') and lens_native_res.get('ocr_text'):
             logger.info(f"Google Lens Nativo detectou OCR: '{lens_native_res.get('ocr_text')}'")
             return lens_native_res
 
-        # 2. Google Cloud Vision WEB_DETECTION + OCR + Labels (Nativo Google Cloud)
+        # 3. Google Cloud Vision WEB_DETECTION + OCR + Labels (Nativo Google Cloud)
         if google_vision_key:
             try:
                 res = cls._call_google_vision_web_detection(imagens[0].imagem.path, google_vision_key)
@@ -56,7 +66,7 @@ class VisualSearchService:
             except Exception as e:
                 logger.error(f"Erro no Google Cloud Vision Web Detection: {e}")
 
-        # 3. Gemini 3.7 Flash com Grounding Multimodal (Google Search Tool)
+        # 4. Gemini 3.7 Flash com Grounding Multimodal (Google Search Tool)
         if gemini_key:
             try:
                 res = cls._call_gemini_grounded_vision(imagens, gemini_key, item)
@@ -64,15 +74,6 @@ class VisualSearchService:
                     return res
             except Exception as e:
                 logger.error(f"Erro no Gemini Grounded Vision: {e}")
-
-        # 4. SerpApi Google Lens Engine (API dedicada do Google Lens)
-        if serpapi_key:
-            try:
-                res = cls._call_serpapi_google_lens(imagens[0].imagem.path, serpapi_key)
-                if res.get('success'):
-                    return res
-            except Exception as e:
-                logger.error(f"Erro no SerpApi Google Lens: {e}")
 
         return lens_native_res if lens_native_res.get('success') else {
             "success": False,
@@ -335,13 +336,28 @@ class VisualSearchService:
     def _call_serpapi_google_lens(cls, image_path: str, api_key: str) -> Dict[str, Any]:
         """
         Executa a pesquisa visual na SerpApi usando a engine oficial 'google_lens'.
+        Redimensiona automaticamente com Pillow para garantir tamanho < 500KB.
         """
+        import io
+        from PIL import Image
+
+        # Redimensiona para max 800x800 e comprime em JPEG (< 500KB)
+        im = Image.open(image_path)
+        im.thumbnail((800, 800))
+        buf = io.BytesIO()
+        im.convert("RGB").save(buf, format="JPEG", quality=85)
+        buf.seek(0)
+
         upload_url = "https://serpapi.com/image"
-        with open(image_path, "rb") as f:
-            upload_resp = requests.post(upload_url, files={"file": f}, data={"api_key": api_key}, timeout=20)
-            upload_resp.raise_for_status()
-            upload_data = upload_resp.json()
-            image_id = upload_data.get("image_id") or upload_data.get("url")
+        upload_resp = requests.post(
+            upload_url,
+            files={"image": ("image.jpg", buf, "image/jpeg")},
+            data={"api_key": api_key},
+            timeout=25
+        )
+        upload_resp.raise_for_status()
+        upload_data = upload_resp.json()
+        image_id = upload_data.get("image_id")
 
         if not image_id:
             return {"success": False, "provider": "serpapi_lens"}
@@ -350,29 +366,51 @@ class VisualSearchService:
         params = {
             "api_key": api_key,
             "engine": "google_lens",
-            "image_id": image_id,
-            "hl": "pt-br",
-            "gl": "br"
+            "image_id": image_id
         }
-        resp = requests.get(search_url, params=params, timeout=25)
+        resp = requests.get(search_url, params=params, timeout=30)
         resp.raise_for_status()
         res_data = resp.json()
 
         visual_matches = res_data.get("visual_matches", [])
+        related_content = res_data.get("related_content", [])
+        organic_results = res_data.get("organic_results", [])
+
         urls = []
         titles = []
         for vm in visual_matches:
-            if vm.get("link"):
+            if vm.get("link") and vm.get("link").startswith("http") and vm.get("link") not in urls:
                 urls.append(vm.get("link"))
             if vm.get("title") and vm.get("title") not in titles:
                 titles.append(vm.get("title"))
 
+        for org in organic_results:
+            if org.get("link") and org.get("link").startswith("http") and org.get("link") not in urls:
+                urls.append(org.get("link"))
+            if org.get("title") and org.get("title") not in titles:
+                titles.append(org.get("title"))
+
+        for rc in related_content:
+            if rc.get("query") and rc.get("query") not in titles:
+                titles.append(rc.get("query"))
+
         best_title = titles[0] if titles else ""
+        marca = ""
+        modelo = ""
+        if titles:
+            # Extrai primeira marca/modelo provável
+            words = titles[0].split()
+            if len(words) > 1:
+                marca = words[0].capitalize()
+                modelo = " ".join(words[1:4])
+
         return {
-            "success": bool(urls or best_title),
+            "success": bool(urls or titles),
             "provider": "serpapi_google_lens",
             "produto_identificado": best_title,
-            "entidades": titles[:5],
+            "marca": marca,
+            "modelo": modelo,
+            "entidades": titles[:8],
             "labels": [],
             "ocr_text": "",
             "urls_diretas": urls[:6]
