@@ -1,3 +1,4 @@
+import re
 import urllib.parse
 from core.models import Item, ConfiguracaoVendedor
 
@@ -8,16 +9,34 @@ def get_formatted_price(price):
     return f"R$ {price:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
+def clean_markdown_for_marketplace(text: str) -> str:
+    """
+    Remove marcadores técnicos de Markdown (#, **, *, _, ~~) preservando
+    a legibilidade, espaçamento de parágrafos e tópicos com bullet (•).
+    """
+    if not text:
+        return ""
+    # Remove cabeçalhos Markdown (#, ##, etc.)
+    text = re.sub(r"(?m)^#{1,6}\s*", "", text)
+    # Remove formatações de negrito, itálico e tachado
+    text = re.sub(r"(\*\*|__)(.*?)\1", r"\2", text)
+    text = re.sub(r"(\*|_)(.*?)\1", r"\2", text)
+    text = re.sub(r"~~(.*?)~~", r"\1", text)
+    # Normaliza marcadores de tópicos para bullet limpo
+    text = re.sub(r"(?m)^\s*[-*+]\s+", "• ", text)
+    text = re.sub(r"(?m)^\s*[●▪]\s+", "• ", text)
+    # Limpa excesso de quebras de linha
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
+
 def format_for_olx(item: Item, base_url: str = "") -> str:
     """
     Formatação de texto puro otimizada para OLX (sem markdown, tópicos limpos e legíveis).
     """
     preco = get_formatted_price(item.preco_usado)
     estado = item.get_estado_conservacao_display()
-    descricao = item.descricao_efetiva
-
-    # Remove marcas markdown comuns caso existam
-    descricao_limpa = descricao.replace('**', '').replace('##', '').replace('###', '')
+    descricao_limpa = clean_markdown_for_marketplace(item.descricao_efetiva)
 
     texto = (
         f"{item.titulo}\n\n"
@@ -55,7 +74,7 @@ def format_for_mercadolivre(item: Item, base_url: str = "") -> str:
     """
     preco = get_formatted_price(item.preco_usado)
     estado = item.get_estado_conservacao_display()
-    descricao = item.descricao_efetiva.replace('**', '').replace('##', '').replace('###', '')
+    descricao = clean_markdown_for_marketplace(item.descricao_efetiva)
 
     texto = (
         f"=========================================\n"
@@ -92,7 +111,7 @@ def format_for_facebook(item: Item, base_url: str = "") -> str:
     preco = get_formatted_price(item.preco_usado)
     estado = item.get_estado_conservacao_display()
 
-    descricao_limpa = item.descricao_efetiva.replace('**', '').replace('##', '').replace('###', '').strip()
+    descricao_limpa = clean_markdown_for_marketplace(item.descricao_efetiva)
     if len(descricao_limpa) > 900:
         descricao_exibida = f"{descricao_limpa[:850]}..."
     else:
@@ -105,6 +124,7 @@ def format_for_facebook(item: Item, base_url: str = "") -> str:
         f"📝 Descrição & Especificações:\n"
         f"{descricao_exibida}\n\n"
     )
+
 
     if item.defeitos_visiveis:
         texto += f"🔍 Observação: {item.defeitos_visiveis}\n\n"

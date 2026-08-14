@@ -308,4 +308,62 @@ class HubDesapegoCoreTests(TestCase):
         self.assertContains(resp, "admin_subtle_actions.css")
         self.assertContains(resp, f'data-item-id="{item.pk}"')
 
+    def test_markdown_extras_render_markdown(self):
+        from core.templatetags.markdown_extras import render_markdown
+        sample = (
+            "## 📦 **Visão Geral**\n"
+            "Fone de ouvido Sennheiser.\n\n"
+            "## 📋 **Ficha Técnica & Especificações**\n"
+            "• Driver: 40mm\n"
+            "• Impedância: 18 Ohms\n\n"
+            "💬 *Fique à vontade para perguntar!*"
+        )
+        html = render_markdown(sample)
+        self.assertIn("<h2", html)
+        self.assertIn("📦", html)
+        self.assertIn("Visão Geral", html)
+        self.assertNotIn("##", html)
+        self.assertIn("<ul>", html)
+        self.assertIn("<li>Driver: 40mm</li>", html)
+        self.assertIn("<em>Fique à vontade para perguntar!</em>", html)
+
+    def test_markdown_extras_strip_markdown(self):
+        from core.templatetags.markdown_extras import strip_markdown
+        sample = (
+            "## 📦 **Visão Geral**\n"
+            "Violão Yamaha C40.\n\n"
+            "## 📋 **Ficha Técnica:**\n"
+            "• Marca: Yamaha\n"
+            "• Modelo: C40"
+        )
+        plain = strip_markdown(sample)
+        self.assertNotIn("##", plain)
+        self.assertNotIn("**", plain)
+        self.assertIn("📦 Visão Geral Violão Yamaha C40. 📋 Ficha Técnica: Marca: Yamaha Modelo: C40", plain)
+
+    def test_item_descricao_markdown_properties(self):
+        item = Item.objects.create(
+            titulo="Fone Bluetooth Anker",
+            descricao_ia="## 📦 **Visão Geral**\nFone com cancelamento ativo.",
+            status=Item.Status.APROVADO
+        )
+        self.assertIn("<h2", item.descricao_efetiva_html)
+        self.assertNotIn("##", item.descricao_efetiva_html)
+        self.assertIn("📦 Visão Geral Fone com cancelamento ativo.", item.descricao_efetiva_texto_puro)
+
+    def test_item_detail_view_renders_formatted_markdown(self):
+        item = Item.objects.create(
+            titulo="Violão Acústico Eagle",
+            descricao_ia="## 📦 **Visão Geral**\nViolão profissional com excelente afinação.\n\n## 📋 **Ficha Técnica**\n• Tampo: Spruce",
+            status=Item.Status.APROVADO
+        )
+        resp = self.client.get(f'/item/{item.slug}/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "prose-desapego")
+        self.assertContains(resp, "<h2")
+        self.assertContains(resp, "<li>Tampo: Spruce</li>")
+        # Ensure raw markdown headers are not displayed as literal text
+        self.assertNotContains(resp, "## 📦 **Visão Geral**")
+
+
 

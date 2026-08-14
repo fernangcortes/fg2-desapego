@@ -221,6 +221,213 @@
 
         container.appendChild(toast);
 
+        setTimeout(() => {
+            toast.classList.add('toast-hide');
+            setTimeout(() => toast.remove(), 250);
+        }, 3500);
+    }
+
+    /* ==========================================================================
+       Admin Markdown Live Formatter (Descrição Sugerida por IA & Manual)
+       ========================================================================== */
+
+    function parseMarkdownToHtml(md) {
+        if (!md || typeof md !== 'string' || !md.trim()) {
+            return '<p class="admin-md-empty-hint"><em>Nenhuma descrição gerada por IA ainda. Execute a análise de IA acima para criar o copywriting automático.</em></p>';
+        }
+
+        let text = md;
+
+        // 1. Normaliza marcadores de tópicos unicode
+        text = text.replace(/^[ \t]*[•●▪][ \t]+/gm, '- ');
+
+        // 2. Limpa asteriscos redundantes dentro de títulos (ex: ## **Título** -> ## Título)
+        text = text.replace(/^(#{1,6}[ \t]+)\*\*(.*?)\*\*/gm, '$1$2');
+
+        const escapeHtml = (str) =>
+            str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+        const inlineFormat = (str) => {
+            // Negrito **texto** ou __texto__
+            str = str.replace(/(\*\*|__)(.*?)\1/g, '<strong>$2</strong>');
+            // Itálico *texto* ou _texto_
+            str = str.replace(/(\*|_)(.*?)\1/g, '<em>$2</em>');
+            // Código `code`
+            str = str.replace(/`([^`]+)`/g, '<code>$1</code>');
+            return str;
+        };
+
+        const lines = text.split(/\r?\n/);
+        let html = '';
+        let inList = false;
+        let listType = '';
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trimEnd();
+
+            // Cabeçalhos (#, ##, ###, ####)
+            const headerMatch = line.match(/^(#{1,6})\s+(.*)$/);
+            if (headerMatch) {
+                if (inList) { html += listType === 'ol' ? '</ol>' : '</ul>'; inList = false; }
+                const level = Math.min(headerMatch[1].length, 6);
+                const content = inlineFormat(escapeHtml(headerMatch[2]));
+                html += `<h${level} class="admin-md-h${level}">${content}</h${level}>`;
+                continue;
+            }
+
+            // Itens de lista não ordenada (- item ou * item)
+            const ulMatch = line.match(/^[-*]\s+(.*)$/);
+            if (ulMatch) {
+                if (!inList || listType !== 'ul') {
+                    if (inList) html += listType === 'ol' ? '</ol>' : '</ul>';
+                    html += '<ul class="admin-md-ul">';
+                    inList = true;
+                    listType = 'ul';
+                }
+                html += `<li>${inlineFormat(escapeHtml(ulMatch[1]))}</li>`;
+                continue;
+            }
+
+            // Itens de lista ordenada (1. item)
+            const olMatch = line.match(/^\d+\.\s+(.*)$/);
+            if (olMatch) {
+                if (!inList || listType !== 'ol') {
+                    if (inList) html += listType === 'ol' ? '</ol>' : '</ul>';
+                    html += '<ol class="admin-md-ol">';
+                    inList = true;
+                    listType = 'ol';
+                }
+                html += `<li>${inlineFormat(escapeHtml(olMatch[1]))}</li>`;
+                continue;
+            }
+
+            // Linha vazia
+            if (!line.trim()) {
+                if (inList) {
+                    html += listType === 'ol' ? '</ol>' : '</ul>';
+                    inList = false;
+                }
+                continue;
+            }
+
+            // Parágrafo
+            if (inList) {
+                html += listType === 'ol' ? '</ol>' : '</ul>';
+                inList = false;
+            }
+            html += `<p class="admin-md-p">${inlineFormat(escapeHtml(line))}</p>`;
+        }
+
+        if (inList) {
+            html += listType === 'ol' ? '</ol>' : '</ul>';
+        }
+
+        return html;
+    }
+
+    function initAdminMarkdownFields() {
+        const iaField = document.getElementById('id_descricao_ia');
+        if (!iaField || iaField.dataset.mdEnhanced === 'true') return;
+
+        iaField.dataset.mdEnhanced = 'true';
+
+        // Cria o container do card formatado
+        const wrapper = document.createElement('div');
+        wrapper.className = 'admin-md-card-wrapper';
+        wrapper.id = 'admin-md-wrapper-id_descricao_ia';
+
+        wrapper.innerHTML = `
+            <div class="admin-md-toolbar">
+                <div class="admin-md-tabs">
+                    <button type="button" class="admin-md-tab-btn is-active" data-mode="rendered">
+                        <span>👁️ Visual Formatado</span>
+                    </button>
+                    <button type="button" class="admin-md-tab-btn" data-mode="raw">
+                        <span>✏️ Código / Markdown</span>
+                    </button>
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <button type="button" class="admin-md-copy-btn" id="btn-copy-ia-to-manual" title="Copiar este texto da IA para o campo 'Descrição Manual / Final' para poder personalizá-lo">
+                        <span>📋</span>
+                        <span>Copiar para Descrição Manual</span>
+                    </button>
+                </div>
+            </div>
+            <div class="admin-md-rendered-view" id="admin-md-rendered-id_descricao_ia"></div>
+        `;
+
+        // Insere o card antes da textarea e oculta a textarea por padrão (modo formatado ativo)
+        iaField.parentNode.insertBefore(wrapper, iaField);
+        iaField.style.display = 'none';
+
+        const renderedView = wrapper.querySelector('#admin-md-rendered-id_descricao_ia');
+        const tabBtns = wrapper.querySelectorAll('.admin-md-tab-btn');
+        const copyBtn = wrapper.querySelector('#btn-copy-ia-to-manual');
+
+        const updateRendered = () => {
+            renderedView.innerHTML = parseMarkdownToHtml(iaField.value);
+        };
+
+        // Renderiza estado inicial
+        updateRendered();
+
+        // Escuta digitação na textarea (quando no modo raw)
+        iaField.addEventListener('input', updateRendered);
+        iaField.addEventListener('change', updateRendered);
+
+        // Alternância de abas
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                tabBtns.forEach(b => b.classList.remove('is-active'));
+                btn.classList.add('is-active');
+
+                const mode = btn.dataset.mode;
+                if (mode === 'rendered') {
+                    updateRendered();
+                    renderedView.style.display = 'block';
+                    iaField.style.display = 'none';
+                } else {
+                    renderedView.style.display = 'none';
+                    iaField.style.display = 'block';
+                    iaField.focus();
+                }
+            });
+        });
+
+        // Ação de copiar para Descrição Manual
+        if (copyBtn) {
+            copyBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const manualField = document.getElementById('id_descricao_manual');
+                if (!manualField) {
+                    showAdminSubtleToast('Campo de Descrição Manual não encontrado.', true);
+                    return;
+                }
+
+                if (!iaField.value.trim()) {
+                    showAdminSubtleToast('Descrição de IA está vazia no momento.', true);
+                    return;
+                }
+
+                manualField.value = iaField.value;
+                manualField.dispatchEvent(new Event('input', { bubbles: true }));
+                manualField.dispatchEvent(new Event('change', { bubbles: true }));
+
+                showAdminSubtleToast('✓ Descrição copiada para o campo Descrição Manual!');
+                manualField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                manualField.focus();
+            });
+        }
+    }
+
+    function updateAdminMarkdownPreviews() {
+        const iaField = document.getElementById('id_descricao_ia');
+        const renderedView = document.getElementById('admin-md-rendered-id_descricao_ia');
+        if (iaField && renderedView) {
+            renderedView.innerHTML = parseMarkdownToHtml(iaField.value);
+        }
+    }
+
     async function loadSerpApiQuota() {
         const badges = document.querySelectorAll('.serpapi-quota-badge, #serpapi-quota-badge');
         if (badges.length === 0) return;
@@ -245,5 +452,12 @@
         }
     }
 
+    // Inicialização ao carregar o DOM
+    document.addEventListener('DOMContentLoaded', () => {
+        initAdminMarkdownFields();
+    });
+
+    window.updateAdminMarkdownPreviews = updateAdminMarkdownPreviews;
     window.loadSerpApiQuota = loadSerpApiQuota;
 })();
+

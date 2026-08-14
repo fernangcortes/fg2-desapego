@@ -214,6 +214,18 @@ class Item(models.Model):
         return self.descricao_manual.strip() if self.descricao_manual else self.descricao_ia.strip()
 
     @property
+    def descricao_efetiva_html(self):
+        """Retorna a descrição efetiva formatada como HTML seguro a partir do Markdown."""
+        from core.templatetags.markdown_extras import render_markdown
+        return render_markdown(self.descricao_efetiva)
+
+    @property
+    def descricao_efetiva_texto_puro(self):
+        """Retorna a descrição efetiva como texto limpo sem tags Markdown para cards e resumos."""
+        from core.templatetags.markdown_extras import strip_markdown
+        return strip_markdown(self.descricao_efetiva)
+
+    @property
     def imagem_principal(self):
         """Retorna a imagem principal marcada ou a primeira cadastrada."""
         principal = self.imagens.filter(principal=True).first()

@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
-{% load humanize %}
+{% load humanize markdown_extras %}
+
 
 {% block title %}Hub de Desapego - Itens Incríveis para Venda e Aluguel{% endblock %}
 
@@ -125,8 +126,9 @@
                                 <a href="{% url 'core:item_detail' item.slug %}">{{ item.titulo }}</a>
                             </h2>
                             <p class="text-xs text-slate-500 line-clamp-2 mt-1">
-                                {{ item.descricao_efetiva|default:"Item testado e pronto para entrega." }}
+                                {{ item.descricao_efetiva|strip_markdown|default:"Item testado e pronto para entrega." }}
                             </p>
+
                         </div>
 
                         <!-- Precificação e Ação -->

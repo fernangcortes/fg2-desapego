@@ -4,4 +4,6 @@ python-dotenv>=1.0.0
 django-cleanup>=8.0.0
 requests>=2.31.0
 chrome-lens-py>=3.4.0
+markdown-it-py>=3.0.0
 gunicorn>=21.2.0; sys_platform != 'win32'
+

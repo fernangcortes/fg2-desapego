@@ -87,3 +87,31 @@ class MarketplaceFormattersTests(TestCase):
         json_data = resp_api.json()
         self.assertEqual(json_data['platform'], 'olx')
         self.assertIn('VALOR:', json_data['text'])
+
+    def test_markdown_removal_in_marketplace_formats(self):
+        self.item.descricao_ia = (
+            "## 📦 **Visão Geral**\n"
+            "Microfone de alta performance.\n\n"
+            "## 📋 **Ficha Técnica**\n"
+            "• Padrão Polar: Cardioide\n"
+            "- Conector: XLR balanceado\n\n"
+            "💬 *Dúvidas? Pergunte abaixo!*"
+        )
+        self.item.save()
+
+        olx_text = format_for_olx(self.item)
+        self.assertNotIn("##", olx_text)
+        self.assertNotIn("**", olx_text)
+        self.assertNotIn("💬 *", olx_text)
+        self.assertIn("📦 Visão Geral", olx_text)
+        self.assertIn("• Padrão Polar: Cardioide", olx_text)
+        self.assertIn("• Conector: XLR balanceado", olx_text)
+
+        ml_text = format_for_mercadolivre(self.item)
+        self.assertNotIn("##", ml_text)
+        self.assertNotIn("**", ml_text)
+
+        fb_text = format_for_facebook(self.item)
+        self.assertNotIn("##", fb_text)
+        self.assertNotIn("**", fb_text)
+

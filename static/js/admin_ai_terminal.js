@@ -562,7 +562,11 @@
         updateFormFields(data) {
             const setVal = (id, val) => {
                 const el = document.getElementById(id);
-                if (el && val) el.value = val;
+                if (el && val !== undefined && val !== null) {
+                    el.value = val;
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                }
             };
 
             setVal('id_titulo', data.titulo);
@@ -573,8 +577,13 @@
             setVal('id_categoria', data.categoria);
             setVal('id_descricao_ia', data.descricao_ia);
             setVal('id_defeitos_visiveis', data.defeitos_visiveis);
+
+            if (window.updateAdminMarkdownPreviews) {
+                window.updateAdminMarkdownPreviews();
+            }
         }
     };
+
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => AdminAITerminal.init());
