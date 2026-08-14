@@ -659,11 +659,32 @@ class AIOrchestrator:
         # Passo 4: Notificação
         NotificationService.notify_draft_ready(item)
 
+        def format_currency(val):
+            if val is not None:
+                return f"R$ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            return "-"
+
         return {
             "success": True,
             "item_id": item.id,
             "titulo": item.titulo,
-            "preco_usado": str(item.preco_usado),
+            "preco_usado": str(item.preco_usado) if item.preco_usado is not None else None,
+            "preco_usado_formatado": format_currency(item.preco_usado),
+            "preco_novo_referencia": str(item.preco_novo_referencia) if item.preco_novo_referencia is not None else None,
+            "preco_novo_formatado": format_currency(item.preco_novo_referencia),
+            "preco_aluguel": str(item.preco_aluguel) if item.preco_aluguel is not None else None,
             "categoria": item.categoria,
-            "urls_referencia": item.urls_referencia
+            "categoria_display": item.get_categoria_display(),
+            "estado_conservacao": item.estado_conservacao,
+            "estado_conservacao_display": item.get_estado_conservacao_display(),
+            "defeitos_visiveis": item.defeitos_visiveis,
+            "descricao_ia": item.descricao_ia,
+            "urls_referencia": item.urls_referencia or [],
+            "num_urls": len(item.urls_referencia) if item.urls_referencia else 0,
+            "vision_data": vision_result,
+            "market_data": {
+                "preco_novo_estimado": market_result.get("preco_novo_estimado"),
+                "preco_usado_medio": market_result.get("preco_usado_medio"),
+                "urls_count": len(market_result.get("urls_referencia", []))
+            }
         }

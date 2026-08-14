@@ -19,8 +19,13 @@ def process_item_ai_view(request, item_id):
     else:
         messages.error(request, f"Erro ao processar item com IA: {resultado.get('error')}")
 
-    # Se a requisição pedir JSON (ex: HTMX ou fetch)
-    if request.headers.get('accept') == 'application/json' or request.GET.get('format') == 'json':
+    # Se a requisição pedir JSON (ex: HTMX, Terminal JS ou fetch)
+    if (
+        request.headers.get('accept') == 'application/json' or
+        'application/json' in request.headers.get('accept', '') or
+        request.headers.get('x-requested-with') == 'XMLHttpRequest' or
+        request.GET.get('format') == 'json'
+    ):
         return JsonResponse(resultado)
 
     # Redireciona de volta para a edição do item no Django Admin

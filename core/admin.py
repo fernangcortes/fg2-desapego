@@ -50,9 +50,15 @@ class ItemAdmin(admin.ModelAdmin):
 
     class Media:
         css = {
-            'all': ('css/admin_subtle_actions.css',)
+            'all': (
+                'css/admin_subtle_actions.css',
+                'css/admin_ai_terminal.css',
+            )
         }
-        js = ('js/admin_ai_loading.js', 'js/admin_subtle_actions.js')
+        js = (
+            'js/admin_ai_terminal.js',
+            'js/admin_subtle_actions.js',
+        )
 
 
     fieldsets = (
@@ -139,7 +145,7 @@ class ItemAdmin(admin.ModelAdmin):
         delete_url = reverse('core:quick_delete_item', args=[obj.pk])
         return format_html(
             '<div class="admin-subtle-actions">'
-            '<a href="{}" class="admin-subtle-btn admin-ai-action-btn" title="Processar com IA">'
+            '<a href="{}" class="admin-subtle-btn admin-ai-action-btn" data-item-id="{}" data-item-title="{}" title="Processar com IA">'
             '<svg viewBox="0 0 24 24"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/><path d="M5 3v4"/><path d="M19 17v4"/></svg>'
             '</a>'
             '<a href="{}" class="admin-subtle-btn admin-export-action-btn" title="Exportar Anúncio">'
@@ -154,7 +160,7 @@ class ItemAdmin(admin.ModelAdmin):
             '<span class="delete-confirm-label">Excluir?</span>'
             '</button>'
             '</div>',
-            process_url, export_url, obj.pk, obj.titulo, delete_url
+            process_url, obj.pk, obj.titulo, export_url, obj.pk, obj.titulo, delete_url
         )
     botoes_acao.short_description = "Ações Rápidas"
 
