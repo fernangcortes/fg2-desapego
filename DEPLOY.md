@@ -1,10 +1,39 @@
-# 🚀 Guia de Deploy em VPS Linux (Ubuntu) - Hub de Desapego Inteligente
-
-Este guia detalha o processo completo de instalação e deploy em produção em qualquer VPS Linux (Ubuntu 22.04 LTS ou 24.04 LTS) utilizando **Python 3.12**, **Gunicorn**, **Nginx**, **Systemd** e **SQLite**.
+# 🚀 Guia de Deploy em Produção - Hub de Desapego Inteligente
 
 ---
 
-## 1. Requisitos do Servidor VPS
+## 🌐 Servidor em Produção Configurado (Google Cloud Compute Engine)
+
+O servidor de produção está ativo e configurado com autenticação SSH:
+
+| Parâmetro | Valor |
+| :--- | :--- |
+| **Provedor** | Google Cloud (Compute Engine) |
+| **Instância** | `hub-desapego` |
+| **Projeto GCP** | `gen-lang-client-0544055197` |
+| **Zona** | `us-east1-b` |
+| **IP Público** | `34.138.7.51` |
+| **Usuário SSH** | `fgc` |
+| **Diretório da Aplicação** | `/var/www/hub-desapego` |
+| **Serviço Systemd** | `gunicorn_desapego` |
+| **Web Server** | `nginx` |
+
+### ⚡ Comando Direto de Deploy Remoto (Usado pelo Chat / IA)
+```powershell
+ssh fgc@34.138.7.51 "cd /var/www/hub-desapego && sudo bash deploy/deploy.sh"
+```
+
+### 🔍 Comandos de Diagnóstico Remoto
+- **Verificar status dos serviços:**
+  ```powershell
+  ssh fgc@34.138.7.51 "sudo systemctl status gunicorn_desapego && sudo systemctl status nginx"
+  ```
+- **Ver logs da aplicação em tempo real:**
+  ```powershell
+  ssh fgc@34.138.7.51 "sudo journalctl -u gunicorn_desapego -f -n 50"
+  ```
+
+---
 - **VPS Recomendada:** Ubuntu 22.04 ou 24.04 LTS (1 GB de RAM e 1 vCPU é suficiente para ~300 itens). Exemplos: Hetzner (€3.5/mês), DigitalOcean ($4-6/mês) ou Linode.
 - **Acesso:** SSH com privilégios de `sudo`.
 - **Domínio apontado:** Registros DNS tipo `A` apontando seu domínio (ex: `desapego.meudominio.com.br`) para o IP público do VPS.
