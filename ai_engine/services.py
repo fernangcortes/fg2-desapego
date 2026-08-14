@@ -35,11 +35,13 @@ class VisualSearchService:
                 "produto_identificado": "",
                 "marca": "",
                 "modelo": "",
+                "ocr_text": "",
                 "entidades": [],
+                "labels": [],
                 "urls_diretas": []
             }
 
-        # 1. Google Cloud Vision WEB_DETECTION (Nativo Google, 1.000 req/mês grátis, aceita Base64 local)
+        # 1. Google Cloud Vision WEB_DETECTION + OCR + Labels (Nativo Google Cloud)
         if google_vision_key:
             try:
                 res = cls._call_google_vision_web_detection(imagens[0].imagem.path, google_vision_key)
@@ -72,15 +74,17 @@ class VisualSearchService:
             "produto_identificado": "",
             "marca": "",
             "modelo": "",
+            "ocr_text": "",
             "entidades": [],
+            "labels": [],
             "urls_diretas": []
         }
 
     @classmethod
     def _call_google_vision_web_detection(cls, image_path: str, api_key: str) -> Dict[str, Any]:
         """
-        Envia a imagem em Base64 para a Google Cloud Vision API com WEB_DETECTION.
-        Retorna rótulos de melhor estimativa (bestGuessLabels), entidades e páginas com imagens correspondentes.
+        Envia a imagem em Base64 para a Google Cloud Vision API com WEB_DETECTION, TEXT_DETECTION e LABEL_DETECTION.
+        Retorna rótulos de melhor estimativa (bestGuessLabels), textos lidos por OCR, entidades e páginas com imagens correspondentes.
         """
         with open(image_path, "rb") as f:
             b64_img = base64.b64encode(f.read()).decode("utf-8")
@@ -90,7 +94,11 @@ class VisualSearchService:
             "requests": [
                 {
                     "image": {"content": b64_img},
-                    "features": [{"type": "WEB_DETECTION", "maxResults": 10}]
+                    "features": [
+                        {"type": "WEB_DETECTION", "maxResults": 10},
+                        {"type": "TEXT_DETECTION", "maxResults": 10},
+                        {"type": "LABEL_DETECTION", "maxResults": 10}
+                    ]
                 }
             ]
         }
@@ -102,7 +110,16 @@ class VisualSearchService:
         if not responses:
             return {"success": False, "provider": "google_vision"}
 
-        web_detection = responses[0].get("webDetection", {})
+        first_resp = responses[0]
+        web_detection = first_resp.get("webDetection", {})
+        text_annotations = first_resp.get("textAnnotations", [])
+        label_annotations = first_resp.get("labelAnnotations", [])
+
+        # OCR: texto completo lido na imagem
+        ocr_text = text_annotations[0].get("description", "").strip() if text_annotations else ""
+
+        # Labels visuais
+        labels = [l.get("description", "").strip() for l in label_annotations if l.get("description")]
 
         # Rótulo de melhor estimativa do Google
         best_guess = ""
@@ -125,24 +142,43 @@ class VisualSearchService:
             if u and u.startswith("http") and u not in direct_urls:
                 direct_urls.append(u)
 
+        # Categorias genéricas em inglês que não devem ser tratadas como marca/modelo
+        generic_categories = {
+            'electronics', 'electronic device', 'hardware', 'gadget', 'technology',
+            'shoe', 'plastic bottle', 'bottle', 'water', 'furniture', 'appliance',
+            'audio equipment', 'headphones', 'table', 'desk', 'product'
+        }
+
         # Extração de marca e modelo prováveis a partir do best_guess e entidades
         marca = ""
         modelo = ""
-        if best_guess:
+        produto_identificado = ""
+
+        if best_guess and best_guess.lower() not in generic_categories:
+            produto_identificado = best_guess
             words = best_guess.split()
             if len(words) > 1:
                 marca = words[0].capitalize()
                 modelo = " ".join(words[1:])
             else:
                 modelo = best_guess
+        elif entities:
+            # Pega a primeira entidade que não seja categoria genérica
+            specific_entities = [e for e in entities if e.lower() not in generic_categories]
+            if specific_entities:
+                produto_identificado = specific_entities[0]
+                if len(specific_entities) > 1:
+                    marca = specific_entities[1]
 
         return {
-            "success": bool(best_guess or direct_urls or entities),
+            "success": bool(produto_identificado or direct_urls or ocr_text or entities),
             "provider": "google_vision_web_detection",
-            "produto_identificado": best_guess or (entities[0] if entities else ""),
+            "produto_identificado": produto_identificado,
             "marca": marca,
             "modelo": modelo,
+            "ocr_text": ocr_text,
             "entidades": entities[:8],
+            "labels": labels[:8],
             "urls_diretas": direct_urls[:6]
         }
 
@@ -222,6 +258,8 @@ class VisualSearchService:
                     "marca": parsed.get('marca', ''),
                     "modelo": parsed.get('modelo', ''),
                     "entidades": [parsed.get('marca', ''), parsed.get('modelo', '')],
+                    "labels": [],
+                    "ocr_text": "",
                     "urls_diretas": urls[:6],
                     "categoria_sugerida": parsed.get('categoria_sugerida', '')
                 }
@@ -238,7 +276,6 @@ class VisualSearchService:
         """
         Executa a pesquisa visual na SerpApi usando a engine oficial 'google_lens'.
         """
-        # Upload da imagem local para a SerpApi
         upload_url = "https://serpapi.com/image"
         with open(image_path, "rb") as f:
             upload_resp = requests.post(upload_url, files={"file": f}, data={"api_key": api_key}, timeout=20)
@@ -276,41 +313,43 @@ class VisualSearchService:
             "provider": "serpapi_google_lens",
             "produto_identificado": best_title,
             "entidades": titles[:5],
+            "labels": [],
+            "ocr_text": "",
             "urls_diretas": urls[:6]
         }
 
 
 class VisionService:
     """
-    Serviço de Visão Computacional (Google Gemini 3.7 Flash ou Groq Llama 3.2 Vision).
+    Serviço de Visão Computacional (Gemini Flash ou Google Cloud Vision + DeepSeek Reasoner).
     Analisa fotos para identificar produto, marca, modelo exato, defeitos visíveis e acessórios.
     """
     @classmethod
     def analyze_item_images(cls, item: Item, visual_hint: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         api_config = getattr(settings, 'AI_CONFIG', {})
         gemini_key = api_config.get('GEMINI_API_KEY')
-        groq_key = api_config.get('GROQ_API_KEY')
+        deepseek_key = api_config.get('DEEPSEEK_API_KEY')
 
         # Coleta imagens
         imagens = item.imagens.all()
         if not imagens.exists():
             return cls._fallback_vision_data(item, "Nenhuma foto fornecida.", visual_hint=visual_hint)
 
-        # Tenta Gemini primeiro se configurado
+        # 1. Tenta Gemini Vision se configurado
         if gemini_key:
             try:
                 return cls._call_gemini_vision(imagens, gemini_key, item, visual_hint=visual_hint)
             except Exception as e:
-                logger.error(f"Erro no Gemini Vision: {e}")
+                logger.warning(f"Gemini Vision indisponível ou quota esgotada: {e}")
 
-        # Tenta Groq se configurado
-        if groq_key:
+        # 2. Tenta DeepSeek Reasoner alimentado por Google Vision (OCR + Labels + Entidades)
+        if deepseek_key and visual_hint and visual_hint.get("success"):
             try:
-                return cls._call_groq_vision(imagens, groq_key, item, visual_hint=visual_hint)
+                return cls._call_deepseek_vision_reasoning(deepseek_key, item, visual_hint)
             except Exception as e:
-                logger.error(f"Erro no Groq Vision: {e}")
+                logger.error(f"Erro no DeepSeek Vision Reasoning: {e}")
 
-        # Fallback inteligente se nenhuma chave estiver configurada
+        # Fallback inteligente
         return cls._fallback_vision_data(item, visual_hint=visual_hint)
 
     @classmethod
@@ -322,9 +361,9 @@ class VisionService:
         if visual_hint and visual_hint.get("produto_identificado"):
             hint_text = (
                 f"\n[DICA DE CORRESPONDÊNCIA VISUAL - GOOGLE LENS / WEB DETECTION]:\n"
-                f"Possível produto identificado visualmente na web: '{visual_hint.get('produto_identificado')}'. "
+                f"Possível produto identificado: '{visual_hint.get('produto_identificado')}'. "
                 f"Marca sugerida: '{visual_hint.get('marca')}', Modelo sugerido: '{visual_hint.get('modelo')}'. "
-                f"Use essas informações como forte referência técnica caso correspondam ao item nas fotos.\n"
+                f"OCR detectado: '{visual_hint.get('ocr_text', '')}'.\n"
             )
 
         system_instruction = (
@@ -392,42 +431,49 @@ class VisionService:
         raise Exception("Nenhum modelo Gemini retornou resposta válida.")
 
     @classmethod
-    def _call_groq_vision(cls, imagens, api_key: str, item: Item, visual_hint: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        url = "https://api.groq.com/openai/v1/chat/completions"
-        content_parts = []
+    def _call_deepseek_vision_reasoning(cls, api_key: str, item: Item, visual_hint: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Interpreta dados estruturados de visão computacional (OCR, entidades, rótulos) usando o DeepSeek LLM.
+        """
+        url = "https://api.deepseek.com/chat/completions"
+        system_prompt = (
+            "Você é um perito em identificação de produtos para venda e desapego no Brasil.\n"
+            "Analise os dados visuais extraídos por visão computacional (OCR, detecção de texto na foto, rótulos e entidades web) "
+            "e identifique com precisão o produto, marca, modelo real e categoria.\n\n"
+            "Responda estritamente em formato JSON com as chaves:\n"
+            "{\n"
+            '  "produto_identificado": "Nome claro do produto",\n'
+            '  "marca": "Marca identificada ou Genérica",\n'
+            '  "modelo": "Modelo ou código específico",\n'
+            '  "categoria_sugerida": "uma entre: eletronicos, moveis, eletrodomesticos, ferramentas, instrumentos, vestuario, esportes, livros, outros",\n'
+            '  "estado_conservacao": "um entre: novo, excelente, bom, marcas_uso, defeito_reparo",\n'
+            '  "defeitos_visiveis": "descrição honesta de marcas de uso",\n'
+            '  "acessorios_visiveis": "acessórios identificados",\n'
+            '  "especificacoes_visiveis": "especificações perceptíveis"\n'
+            "}"
+        )
 
-        hint_text = ""
-        if visual_hint and visual_hint.get("produto_identificado"):
-            hint_text = f" Dica visual web: {visual_hint.get('produto_identificado')}."
-
-        content_parts.append({
-            "type": "text",
-            "text": (
-                f"Identifique com precisão o produto nas fotos, marca e modelo exato.{hint_text} Liste defeitos visíveis e acessórios. "
-                "Retorne estritamente um JSON com: produto_identificado, marca, modelo, "
-                "categoria_sugerida, estado_conservacao, defeitos_visiveis, acessorios_visiveis, especificacoes_visiveis."
-            )
-        })
-
-        for img_obj in imagens[:2]:
-            if os.path.exists(img_obj.imagem.path):
-                with open(img_obj.imagem.path, "rb") as f:
-                    b64_data = base64.b64encode(f.read()).decode('utf-8')
-                    content_parts.append({
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{b64_data}"}
-                    })
+        user_content = json.dumps({
+            "titulo_informado": item.titulo,
+            "observacoes_vendedor": item.defeitos_visiveis or "",
+            "texto_lido_ocr": visual_hint.get("ocr_text", ""),
+            "rotulos_visuais": visual_hint.get("labels", []),
+            "entidades_web": visual_hint.get("entidades", []),
+            "produto_identificado_lens": visual_hint.get("produto_identificado", "")
+        }, ensure_ascii=False)
 
         payload = {
-            "model": "llama-3.2-11b-vision-preview",
-            "messages": [{"role": "user", "content": content_parts}],
+            "model": "deepseek-chat",
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content}
+            ],
             "response_format": {"type": "json_object"}
         }
         headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-        resp = requests.post(url, json=payload, headers=headers, timeout=30)
+        resp = requests.post(url, json=payload, headers=headers, timeout=25)
         resp.raise_for_status()
-        res_json = resp.json()
-        return json.loads(res_json['choices'][0]['message']['content'])
+        return json.loads(resp.json()['choices'][0]['message']['content'])
 
     @classmethod
     def _fallback_vision_data(cls, item: Item, motivo: str = "", visual_hint: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -471,7 +517,10 @@ class MarketSearchService:
 
         generic_placeholders = {
             'generica', 'genérica', 'generica / nao identificada', 'genérica / não identificada',
-            'padrao', 'padrão', 'item avaliado', 'item em análise', 'outros', 'desconhecido', 'desconhecida'
+            'padrao', 'padrão', 'item avaliado', 'item em análise', 'outros', 'desconhecido', 'desconhecida',
+            'electronics', 'electronic device', 'hardware', 'gadget', 'technology',
+            'shoe', 'plastic bottle', 'bottle', 'water', 'furniture', 'appliance',
+            'audio equipment', 'table', 'desk', 'product'
         }
 
         # Se tiver dica visual de modelo exato (ex: Tomate MTG-164), usa para enriquecer
