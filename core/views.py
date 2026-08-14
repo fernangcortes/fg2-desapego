@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from django.http import HttpResponse, Http404
+from django.contrib.admin.views.decorators import staff_member_required
+from django.http import HttpResponse, Http404, JsonResponse
 from django.utils import timezone
 from django.db.models import Q
 from .models import Item, ImagemItem, ConfiguracaoVendedor
@@ -151,3 +152,26 @@ def upload_rapido(request):
         'categorias': Item.Categoria.choices,
         'tipos_anuncio': Item.TipoAnuncio.choices,
     })
+
+
+@staff_member_required
+def quick_delete_item(request, item_id):
+    """
+    Endpoint para exclusão rápida de um item via AJAX ou requisição direta no painel admin.
+    """
+    item = get_object_or_404(Item, pk=item_id)
+    titulo = item.titulo
+
+    if request.method in ['POST', 'DELETE']:
+        item.delete()
+        if request.headers.get('accept') == 'application/json' or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.GET.get('format') == 'json':
+            return JsonResponse({
+                'success': True,
+                'message': f"Item '{titulo}' excluído com sucesso.",
+                'item_id': item_id,
+            })
+        messages.success(request, f"Item '{titulo}' excluído com sucesso.")
+        return redirect('/admin/core/item/')
+
+    return JsonResponse({'error': 'Método não permitido. Use POST para excluir.'}, status=405)
+

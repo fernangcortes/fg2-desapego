@@ -222,3 +222,68 @@ class HubDesapegoCoreTests(TestCase):
         self.assertEqual(resp_staff.status_code, 200)
         self.assertContains(resp_staff, "Item Secreto em Rascunho")
 
+    def test_quick_delete_anonymous_redirect(self):
+        item = Item.objects.create(
+            titulo="Item para Deletar Anon",
+            preco_usado=100.00
+        )
+        resp = self.client.post(f'/item/{item.pk}/quick-delete/')
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(Item.objects.filter(pk=item.pk).exists())
+
+    def test_quick_delete_staff_ajax_success(self):
+        item = Item.objects.create(
+            titulo="Item para Deletar Staff",
+            preco_usado=250.00
+        )
+        img_file = SimpleUploadedFile("foto_del.gif", self.dummy_gif, content_type="image/gif")
+        ImagemItem.objects.create(item=item, imagem=img_file)
+
+        self.client.login(username='admin_test', password='password123')
+        resp = self.client.post(
+            f'/item/{item.pk}/quick-delete/',
+            HTTP_ACCEPT='application/json'
+        )
+        self.assertEqual(resp.status_code, 200)
+        json_data = resp.json()
+        self.assertTrue(json_data.get('success'))
+        self.assertEqual(json_data.get('item_id'), item.pk)
+        self.assertFalse(Item.objects.filter(pk=item.pk).exists())
+        self.assertEqual(ImagemItem.objects.filter(item_id=item.pk).count(), 0)
+
+    def test_quick_delete_staff_redirect_success(self):
+        item = Item.objects.create(
+            titulo="Item Delete Normal",
+            preco_usado=150.00
+        )
+        self.client.login(username='admin_test', password='password123')
+        resp = self.client.post(f'/item/{item.pk}/quick-delete/')
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.url, '/admin/core/item/')
+        self.assertFalse(Item.objects.filter(pk=item.pk).exists())
+
+    def test_quick_delete_get_not_allowed(self):
+        item = Item.objects.create(
+            titulo="Item Delete GET",
+            preco_usado=50.00
+        )
+        self.client.login(username='admin_test', password='password123')
+        resp = self.client.get(f'/item/{item.pk}/quick-delete/')
+        self.assertEqual(resp.status_code, 405)
+        self.assertTrue(Item.objects.filter(pk=item.pk).exists())
+
+    def test_admin_changelist_contains_subtle_actions(self):
+        item = Item.objects.create(
+            titulo="Cadeira Ergonômica Top",
+            preco_usado=890.00
+        )
+        self.client.login(username='admin_test', password='password123')
+        resp = self.client.get('/admin/core/item/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "admin-subtle-actions")
+        self.assertContains(resp, "admin-delete-action-btn")
+        self.assertContains(resp, "admin_subtle_actions.js")
+        self.assertContains(resp, "admin_subtle_actions.css")
+        self.assertContains(resp, f'data-item-id="{item.pk}"')
+
+

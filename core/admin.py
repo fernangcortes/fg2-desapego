@@ -49,7 +49,11 @@ class ItemAdmin(admin.ModelAdmin):
     list_per_page = 25
 
     class Media:
-        js = ('js/admin_ai_loading.js',)
+        css = {
+            'all': ('css/admin_subtle_actions.css',)
+        }
+        js = ('js/admin_ai_loading.js', 'js/admin_subtle_actions.js')
+
 
     fieldsets = (
         ("Informações Principais", {
@@ -132,18 +136,28 @@ class ItemAdmin(admin.ModelAdmin):
     def botoes_acao(self, obj):
         process_url = reverse('ai_engine:process_item', args=[obj.pk])
         export_url = reverse('marketplace:export_modal', args=[obj.pk])
+        delete_url = reverse('core:quick_delete_item', args=[obj.pk])
         return format_html(
-            '<div style="display: flex; gap: 4px; align-items: center;">'
-            '<a href="{}" style="background-color: #f3e8ff; color: #6b21a8; padding: 3px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; text-decoration: none; border: 1px solid #d8b4fe;" title="Executar orquestrador de IA">'
-            '✨ IA'
+            '<div class="admin-subtle-actions">'
+            '<a href="{}" class="admin-subtle-btn admin-ai-action-btn" title="Processar com IA">'
+            '<svg viewBox="0 0 24 24"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/><path d="M5 3v4"/><path d="M19 17v4"/></svg>'
             '</a>'
-            '<a href="{}" style="background-color: #f0fdf4; color: #15803d; padding: 3px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; text-decoration: none; border: 1px solid #bbf7d0;" title="Copiar textos para OLX/ML/Facebook">'
-            '📋 Exportar'
+            '<a href="{}" class="admin-subtle-btn admin-export-action-btn" title="Exportar Anúncio">'
+            '<svg viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>'
             '</a>'
+            '<button type="button" class="admin-subtle-btn admin-delete-action-btn" '
+            'data-item-id="{}" data-item-title="{}" data-delete-url="{}" title="Excluir este item">'
+            '<svg viewBox="0 0 24 24">'
+            '<path class="trash-lid" d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>'
+            '<path class="trash-body" d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0v10m4-10v10m4-10v10"/>'
+            '</svg>'
+            '<span class="delete-confirm-label">Excluir?</span>'
+            '</button>'
             '</div>',
-            process_url, export_url
+            process_url, export_url, obj.pk, obj.titulo, delete_url
         )
     botoes_acao.short_description = "Ações Rápidas"
+
 
     def urls_referencia_formatadas(self, obj):
         if not obj.urls_referencia:
