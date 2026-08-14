@@ -1,5 +1,5 @@
 from unittest.mock import patch, MagicMock
-from django.test import TestCase, Client
+from django.test import TestCase, Client, override_settings
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from core.models import Item, ImagemItem
@@ -14,6 +14,7 @@ from .services import (
 User = get_user_model()
 
 
+@override_settings(AI_CONFIG={})
 class AIEngineServicesTests(TestCase):
     def setUp(self):
         self.client = Client()

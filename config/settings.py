@@ -25,6 +25,15 @@ ALLOWED_HOSTS = [
     if host.strip()
 ]
 
+# Configuração de CSRF para Produção e Mobile
+CSRF_TRUSTED_ORIGINS = [
+    f"http://{host}" for host in ALLOWED_HOSTS if host not in ('*', 'localhost', '127.0.0.1')
+] + [
+    f"https://{host}" for host in ALLOWED_HOSTS if host not in ('*', 'localhost', '127.0.0.1')
+] + [
+    'http://localhost', 'http://127.0.0.1', 'http://34.138.7.51', 'https://34.138.7.51'
+]
+
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',

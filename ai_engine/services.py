@@ -46,7 +46,7 @@ class VisionService:
 
     @classmethod
     def _call_gemini_vision(cls, imagens, api_key: str, item: Item) -> Dict[str, Any]:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        candidate_models = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-flash-latest"]
         parts = []
 
         system_instruction = (
@@ -83,11 +83,22 @@ class VisionService:
             "generationConfig": {"response_mime_type": "application/json"}
         }
 
-        resp = requests.post(url, json=payload, timeout=30)
-        resp.raise_for_status()
-        data = resp.json()
-        content_text = data['candidates'][0]['content']['parts'][0]['text']
-        return json.loads(content_text)
+        last_error = None
+        for model in candidate_models:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+            try:
+                resp = requests.post(url, json=payload, timeout=30)
+                resp.raise_for_status()
+                data = resp.json()
+                content_text = data['candidates'][0]['content']['parts'][0]['text']
+                return json.loads(content_text)
+            except Exception as e:
+                last_error = e
+                continue
+
+        if last_error:
+            raise last_error
+        raise Exception("Nenhum modelo Gemini retornou resposta válida.")
 
     @classmethod
     def _call_groq_vision(cls, imagens, api_key: str, item: Item) -> Dict[str, Any]:
@@ -329,7 +340,7 @@ class CopywritingService:
         observacoes: str,
         api_key: str
     ) -> Dict[str, Any]:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        candidate_models = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-flash-latest"]
         prompt = (
             "Crie um anúncio honesto e atraente para venda de item usado no Brasil. "
             f"Dados: Visão: {json.dumps(vision_data, ensure_ascii=False)}, "
@@ -341,10 +352,22 @@ class CopywritingService:
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {"response_mime_type": "application/json"}
         }
-        resp = requests.post(url, json=payload, timeout=30)
-        resp.raise_for_status()
-        text = resp.json()['candidates'][0]['content']['parts'][0]['text']
-        return json.loads(text)
+
+        last_error = None
+        for model in candidate_models:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+            try:
+                resp = requests.post(url, json=payload, timeout=30)
+                resp.raise_for_status()
+                text = resp.json()['candidates'][0]['content']['parts'][0]['text']
+                return json.loads(text)
+            except Exception as e:
+                last_error = e
+                continue
+
+        if last_error:
+            raise last_error
+        raise Exception("Nenhum modelo Gemini retornou resposta válida.")
 
     @classmethod
     def _fallback_copywriting(
