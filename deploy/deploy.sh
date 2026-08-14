@@ -8,18 +8,21 @@ APP_DIR="/var/www/hub-desapego"
 
 echo "🔄 Atualizando código do repositório..."
 cd $APP_DIR
-sudo -u www-data git pull origin main
+git pull origin main
 
 echo "📦 Atualizando dependências Python..."
-sudo -u www-data $APP_DIR/venv/bin/pip install -r requirements.txt
+$APP_DIR/venv/bin/pip install -r requirements.txt
 
 echo "🗄️ Aplicando novas migrações..."
-sudo -u www-data $APP_DIR/venv/bin/python manage.py migrate --noinput
+$APP_DIR/venv/bin/python manage.py migrate --noinput
 
 echo "🎨 Coletando arquivos estáticos..."
-sudo -u www-data $APP_DIR/venv/bin/python manage.py collectstatic --noinput
+$APP_DIR/venv/bin/python manage.py collectstatic --noinput
+
+echo "🔒 Ajustando permissões para www-data..."
+chown -R www-data:www-data $APP_DIR/media $APP_DIR/staticfiles $APP_DIR/db.sqlite3 2>/dev/null || true
 
 echo "♻️ Recarregando Gunicorn..."
-sudo systemctl restart gunicorn_desapego
+systemctl restart gunicorn_desapego
 
 echo "✅ Deploy concluído com sucesso em $(date)!"
