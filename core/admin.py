@@ -21,10 +21,11 @@ class ImagemItemInline(admin.TabularInline):
             return format_html(
                 '<div style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">'
                 '<img src="{}" style="width: 75px; height: 75px; object-fit: cover; border-radius: 6px; border: 1px solid #ddd;" />'
-                '<a href="https://lens.google.com/" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 600; color: #0284c7; text-decoration: none; padding: 2px 5px; background: #f0f9ff; border-radius: 4px; border: 1px solid #bae6fd;" title="Abrir Google Lens para busca visual por similaridade">'
+                '<button type="button" class="admin-subtle-btn admin-lens-btn" data-image-url="{}" title="Buscar esta foto no Google Lens (abre com a imagem e copia para área de transferência)" style="display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 600; color: #0284c7; background: #f0f9ff; padding: 2px 6px; border-radius: 4px; border: 1px solid #bae6fd; cursor: pointer;">'
                 '🔍 Google Lens'
-                '</a>'
+                '</button>'
                 '</div>',
+                obj.imagem.url,
                 obj.imagem.url
             )
         return "-"
