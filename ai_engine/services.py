@@ -3,6 +3,7 @@ import json
 import base64
 import logging
 import re
+import urllib.parse
 from typing import Dict, Any, List, Optional
 import requests
 from django.conf import settings
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 class VisionService:
     """
     Serviço de Visão Computacional (Google Gemini Flash ou Groq Llama 3.2 Vision).
-    Analisa fotos para identificar produto, marca, modelo e defeitos visíveis.
+    Analisa fotos para identificar produto, marca, modelo exato, defeitos visíveis e acessórios.
     """
     @classmethod
     def analyze_item_images(cls, item: Item) -> Dict[str, Any]:
@@ -50,16 +51,28 @@ class VisionService:
         parts = []
 
         system_instruction = (
-            "Você é um perito em avaliação visual de itens usados para venda e desapego. "
-            "Analise as fotos com atenção aos mínimos detalhes. "
-            "Identifique exatamente o produto, marca, modelo, estado real de conservação e "
-            "CRUCIALMENTE: aponte qualquer defeito, arranhão, mancha, oxidação, poeira ou detalhe de uso visível. "
-            "Responda ESTRITAMENTE em formato JSON com as chaves: "
-            "produto_identificado (string), marca (string), modelo (string), "
-            "categoria_sugerida (uma entre: eletronicos, moveis, eletrodomesticos, ferramentas, instrumentos, vestuario, esportes, livros, outros), "
-            "estado_conservacao (um entre: novo, excelente, bom, marcas_uso, defeito_reparo), "
-            "defeitos_visiveis (string detalhada em português), "
-            "acessorios_visiveis (string com cabos, caixas ou manuais identificados)."
+            "Você é um perito em avaliação visual e técnica de itens usados para venda e desapego no Brasil. "
+            "Analise as fotos com extrema atenção aos detalhes visuais, inscrições de texto, logotipos, modelo e serigrafias no produto.\n"
+            "Identifique com precisão:\n"
+            "1. Produto identificado completo com tipo e função principal\n"
+            "2. Marca exata do fabricante\n"
+            "3. Modelo exato (ex: HD 400S, C40, WH-1000XM4, iPhone 13 128GB, etc.)\n"
+            "4. Categoria mais adequada\n"
+            "5. Estado real de conservação\n"
+            "6. CRUCIALMENTE: aponte qualquer defeito, arranhão, mancha, oxidação, poeira ou desgaste de almofadas/cabos visível.\n"
+            "7. Acessórios visíveis (cabos, conectores, caixa, manual, capa, adaptadores).\n"
+            "8. Especificações perceptíveis visualmente (ex: conector P2 3.5mm destacável, voltagem 110V/220V/Bivolt, tipo de almofada over-ear, controles no cabo).\n\n"
+            "Responda ESTRITAMENTE em formato JSON com as chaves:\n"
+            "{\n"
+            '  "produto_identificado": "string",\n'
+            '  "marca": "string",\n'
+            '  "modelo": "string",\n'
+            '  "categoria_sugerida": "uma entre: eletronicos, moveis, eletrodomesticos, ferramentas, instrumentos, vestuario, esportes, livros, outros",\n'
+            '  "estado_conservacao": "um entre: novo, excelente, bom, marcas_uso, defeito_reparo",\n'
+            '  "defeitos_visiveis": "string detalhada em português",\n'
+            '  "acessorios_visiveis": "string detalhada dos acessórios identificados",\n'
+            '  "especificacoes_visiveis": "string com especificações técnicas visíveis"\n'
+            "}"
         )
         parts.append({"text": system_instruction})
         if item.defeitos_visiveis:
@@ -107,9 +120,9 @@ class VisionService:
         content_parts.append({
             "type": "text",
             "text": (
-                "Identifique o produto nas fotos e liste defeitos visíveis. "
+                "Identifique com precisão o produto nas fotos, marca e modelo exato, liste defeitos visíveis e acessórios. "
                 "Retorne estritamente um JSON com: produto_identificado, marca, modelo, "
-                "categoria_sugerida, estado_conservacao, defeitos_visiveis, acessorios_visiveis."
+                "categoria_sugerida, estado_conservacao, defeitos_visiveis, acessorios_visiveis, especificacoes_visiveis."
             )
         })
 
@@ -143,89 +156,202 @@ class VisionService:
             "categoria_sugerida": item.categoria or "outros",
             "estado_conservacao": item.estado_conservacao or "bom",
             "defeitos_visiveis": item.defeitos_visiveis or "Leves marcas naturais de manuseio e uso cotidiano.",
-            "acessorios_visiveis": "Acessórios e itens visíveis conforme as fotos anexadas."
+            "acessorios_visiveis": "Acessórios e itens visíveis conforme as fotos anexadas.",
+            "especificacoes_visiveis": "Conforme exibido nas imagens."
         }
 
 
 class MarketSearchService:
     """
-    Serviço de Pesquisa de Mercado (Tavily API / Serper API).
-    Busca o preço médio do produto NOVO (Amazon/ML) e USADO (OLX/Enjoei) e coleta URLs.
+    Serviço de Pesquisa de Mercado e Ficha Técnica (Tavily API / Serper API).
+    Busca o preço médio do produto NOVO e USADO no Brasil, especificações técnicas e links específicos.
     """
     @classmethod
-    def search_market_prices(cls, produto_nome: str) -> Dict[str, Any]:
+    def build_search_query(cls, vision_data: Dict[str, Any], fallback_title: str = "") -> str:
+        """
+        Gera uma query precisa e otimizada unindo Marca, Modelo e Tipo de Produto,
+        evitando termos genéricos ou redundâncias.
+        """
+        marca = (vision_data.get('marca') or '').strip()
+        modelo = (vision_data.get('modelo') or '').strip()
+        produto = (vision_data.get('produto_identificado') or '').strip()
+
+        generic_placeholders = {
+            'generica', 'genérica', 'generica / nao identificada', 'genérica / não identificada',
+            'padrao', 'padrão', 'item avaliado', 'item em análise', 'outros', 'desconhecido', 'desconhecida'
+        }
+
+        marca_clean = "" if marca.lower() in generic_placeholders else marca
+        modelo_clean = "" if modelo.lower() in generic_placeholders else modelo
+
+        parts = []
+        if marca_clean:
+            parts.append(marca_clean)
+        if modelo_clean and modelo_clean.lower() not in [p.lower() for p in parts]:
+            parts.append(modelo_clean)
+
+        if produto:
+            produto_words = []
+            for word in produto.split():
+                w_lower = word.lower()
+                if (marca_clean and w_lower in marca_clean.lower()) or (modelo_clean and w_lower in modelo_clean.lower()):
+                    continue
+                if w_lower in generic_placeholders:
+                    continue
+                produto_words.append(word)
+            if produto_words:
+                parts.append(" ".join(produto_words))
+
+        query = " ".join(parts).strip()
+        if not query or len(query) < 3:
+            if fallback_title and not fallback_title.lower().startswith("item em análise"):
+                query = fallback_title.strip()
+            else:
+                query = produto if produto else "Produto Desapego"
+
+        return query
+
+    @classmethod
+    def search_market_prices(cls, produto_query: str) -> Dict[str, Any]:
         api_config = getattr(settings, 'AI_CONFIG', {})
         tavily_key = api_config.get('TAVILY_API_KEY')
         serper_key = api_config.get('SERPER_API_KEY')
 
         if tavily_key:
             try:
-                return cls._call_tavily(produto_nome, tavily_key)
+                return cls._call_tavily(produto_query, tavily_key)
             except Exception as e:
                 logger.error(f"Erro na API Tavily: {e}")
 
         if serper_key:
             try:
-                return cls._call_serper(produto_nome, serper_key)
+                return cls._call_serper(produto_query, serper_key)
             except Exception as e:
                 logger.error(f"Erro na API Serper: {e}")
 
         # Fallback de busca de mercado
-        return cls._fallback_market_data(produto_nome)
+        return cls._fallback_market_data(produto_query)
 
     @classmethod
     def _call_tavily(cls, query: str, api_key: str) -> Dict[str, Any]:
         url = "https://api.tavily.com/search"
         payload = {
             "api_key": api_key,
-            "query": f"{query} preco mercado livre amazon brasil",
-            "search_depth": "basic",
-            "max_results": 5
+            "query": f"{query} preco ficha tecnica mercado livre amazon brasil",
+            "search_depth": "advanced",
+            "max_results": 8
         }
         resp = requests.post(url, json=payload, timeout=20)
         resp.raise_for_status()
         data = resp.json()
 
-        urls = [r.get('url') for r in data.get('results', []) if r.get('url')]
-        snippets = " ".join([r.get('content', '') for r in data.get('results', [])])
-        precos = cls._extract_prices_from_text(snippets)
+        raw_urls = [r.get('url') for r in data.get('results', []) if r.get('url')]
+        snippets_list = [r.get('content', '') for r in data.get('results', []) if r.get('content')]
+        all_snippets = " ".join(snippets_list)
 
-        preco_novo = precos.get('preco_novo')
-        preco_usado = precos.get('preco_usado')
+        precos = cls._extract_prices_from_text(all_snippets)
+        filtered_urls = cls._filter_and_rank_urls(raw_urls, query)
 
         return {
-            "preco_novo_estimado": preco_novo,
-            "preco_usado_medio": preco_usado,
-            "urls_referencia": urls[:5]
+            "preco_novo_estimado": precos.get('preco_novo'),
+            "preco_usado_medio": precos.get('preco_usado'),
+            "urls_referencia": filtered_urls,
+            "snippets_pesquisa": all_snippets[:2000]
         }
 
     @classmethod
     def _call_serper(cls, query: str, api_key: str) -> Dict[str, Any]:
         url = "https://google.serper.dev/search"
         payload = {
-            "q": f"{query} preço brasil",
+            "q": f"{query} preço especificações mercado livre amazon brasil",
             "gl": "br",
             "hl": "pt-br",
-            "num": 5
+            "num": 8
         }
         headers = {"X-API-KEY": api_key, "Content-Type": "application/json"}
         resp = requests.post(url, json=payload, headers=headers, timeout=20)
         resp.raise_for_status()
         data = resp.json()
 
-        urls = [r.get('link') for r in data.get('organic', []) if r.get('link')]
-        snippets = " ".join([r.get('snippet', '') for r in data.get('organic', [])])
-        precos = cls._extract_prices_from_text(snippets)
+        raw_urls = [r.get('link') for r in data.get('organic', []) if r.get('link')]
+        snippets_list = [r.get('snippet', '') for r in data.get('organic', []) if r.get('snippet')]
+        all_snippets = " ".join(snippets_list)
+
+        precos = cls._extract_prices_from_text(all_snippets)
+        filtered_urls = cls._filter_and_rank_urls(raw_urls, query)
 
         return {
             "preco_novo_estimado": precos.get('preco_novo'),
             "preco_usado_medio": precos.get('preco_usado'),
-            "urls_referencia": urls[:5]
+            "urls_referencia": filtered_urls,
+            "snippets_pesquisa": all_snippets[:2000]
         }
 
     @classmethod
+    def _filter_and_rank_urls(cls, raw_urls: List[str], query: str) -> List[str]:
+        """
+        Filtra URLs genéricas, de blog, listas de mais vendidos e nós vazios,
+        priorizando páginas de produto diretas e adicionando links de busca específicos do produto.
+        """
+        # Padrões indesejados (blogs, listas de mais vendidos, nós de categoria genéricos)
+        junk_patterns = [
+            r'/blog/',
+            r'/artigos/',
+            r'/noticias/',
+            r'/materias/',
+            r'/guias/',
+            r'/listas/',
+            r'/gp/bestsellers/',
+            r'/bestsellers/',
+            r'/best-sellers/',
+            r'/zgbs/',
+            r'/b\?ie=UTF8',
+            r'/node=\d+',
+            r'/departamento/',
+            r'/categoria/',
+            r'youtube\.com',
+            r'techtudo\.com\.br/listas/',
+            r'zoom\.com\.br/de-olho-no-zoom/',
+        ]
+
+        valid_urls: List[str] = []
+        foreign_urls: List[str] = []
+
+        for u in raw_urls:
+            if not u or not u.startswith('http'):
+                continue
+
+            # Checa se bate com algum padrão de conteúdo genérico/blog
+            if any(re.search(pat, u, re.IGNORECASE) for pat in junk_patterns):
+                continue
+
+            # Se for amazon internacional (.com, .de) e não amazon.com.br, guarda separado
+            if 'amazon.com/' in u or 'amazon.de/' in u or 'amazon.co.uk/' in u:
+                foreign_urls.append(u)
+            else:
+                if u not in valid_urls:
+                    valid_urls.append(u)
+
+        # Adiciona domínios internacionais se tivermos poucas URLs brasileiras
+        for fu in foreign_urls:
+            if len(valid_urls) < 3 and fu not in valid_urls:
+                valid_urls.append(fu)
+
+        # Garante links diretos de busca no Mercado Livre e Amazon BR com o termo exato
+        encoded_query = urllib.parse.quote_plus(query)
+        ml_search_url = f"https://lista.mercadolivre.com.br/{urllib.parse.quote(query.replace(' ', '-'))}"
+        amz_search_url = f"https://www.amazon.com.br/s?k={encoded_query}"
+
+        # Se houver menos de 2 páginas diretas de produto, adiciona os links diretos de busca
+        if ml_search_url not in valid_urls and len(valid_urls) < 4:
+            valid_urls.append(ml_search_url)
+        if amz_search_url not in valid_urls and len(valid_urls) < 5:
+            valid_urls.append(amz_search_url)
+
+        return valid_urls[:5]
+
+    @classmethod
     def _extract_prices_from_text(cls, text: str) -> Dict[str, Optional[float]]:
-        # Procura padrões como R$ 150,00 ou R$ 1.250,90
         padrao = r'R\$\s?(\d{1,3}(?:\.\d{3})*(?:,\d{2})?)'
         matches = re.findall(padrao, text)
         valores = []
@@ -246,21 +372,25 @@ class MarketSearchService:
         return {"preco_novo": preco_novo, "preco_usado": preco_usado}
 
     @classmethod
-    def _fallback_market_data(cls, produto_nome: str) -> Dict[str, Any]:
+    def _fallback_market_data(cls, produto_query: str) -> Dict[str, Any]:
+        encoded_query = urllib.parse.quote_plus(produto_query)
+        ml_query = urllib.parse.quote(produto_query.replace(' ', '-'))
         return {
             "preco_novo_estimado": None,
             "preco_usado_medio": None,
             "urls_referencia": [
-                f"https://lista.mercadolivre.com.br/{requests.utils.quote(produto_nome)}",
-                f"https://www.google.com/search?q={requests.utils.quote(produto_nome)}+preco"
-            ]
+                f"https://lista.mercadolivre.com.br/{ml_query}",
+                f"https://www.amazon.com.br/s?k={encoded_query}",
+                f"https://www.google.com/search?q={encoded_query}+preco+brasil"
+            ],
+            "snippets_pesquisa": ""
         }
 
 
 class CopywritingService:
     """
-    Serviço de Copywriting (DeepSeek API ou fallback).
-    Gera Título Otimizado, Descrição Honesta e Sugestão de Preços Justos.
+    Serviço de Copywriting Técnico e Honesto (DeepSeek API, Gemini API ou Fallback).
+    Gera Título Otimizado, Descrição Estruturada com Ficha Técnica Exata e Sugestão de Preços Justos.
     """
     @classmethod
     def generate_listing_copy(
@@ -298,13 +428,19 @@ class CopywritingService:
     ) -> Dict[str, Any]:
         url = "https://api.deepseek.com/chat/completions"
         system_prompt = (
-            "Você é um redator profissional especializado em anúncios de desapego e marketplace no Brasil (OLX, Mercado Livre, Facebook). "
-            "Sua marca registrada é a TRANSPARÊNCIA TOTAL: o anúncio deve ser atraente e claro, porém 100% honesto, "
-            "destacando claramente qualquer defeito ou marca de uso identificada para gerar confiança instantânea.\n"
-            "Retorne a resposta estritamente em JSON com o seguinte formato:\n"
+            "Você é um redator profissional e especialista técnico em anúncios de desapego e marketplace no Brasil (OLX, Mercado Livre, Facebook).\n"
+            "Sua marca registrada é a TRANSPARÊNCIA TOTAL aliada a uma FICHA TÉCNICA PRECISA e COMPLETA.\n"
+            "Com base no produto, marca e modelo identificados e nos dados de pesquisa, crie um anúncio de altíssima qualidade técnica.\n\n"
+            "ESTRUTURA OBRIGATÓRIA DA DESCRIÇÃO (formate com títulos e tópicos em Markdown):\n"
+            "1. 📦 **Visão Geral**: Resumo do produto, marca, modelo e principais destaques e usabilidade.\n"
+            "2. 📋 **Ficha Técnica & Especificações Exatas**: Liste as especificações técnicas oficiais e reais do modelo identificado (ex: para áudio/fones: tipo de driver, resposta de frequência, impedância, conector P2/P10/Bluetooth/USB, microfone integrado, isolamento acústico, peso; para instrumentos: madeiras, captação, trastes; para informática/eletrônicos: processador, memória, tela, conexões; para eletros/ferramentas: voltagem, potência em Watts, dimensões, materiais).\n"
+            "3. 🔍 **Transparência Total (Estado Real & Detalhes Visíveis)**: Detalhe de forma 100% honesta qualquer marca de uso, arranhão, desgaste ou detalhe apontado pela visão computacional ou pelo vendedor.\n"
+            "4. 🎁 **Itens Inclusos**: Liste tudo o que acompanha o produto (cabos, adaptadores, capa, manuais, caixa).\n"
+            "5. 🚚 **Condições de Retirada & Envio**: Informações práticas sobre retirada em mãos ou envio seguro.\n\n"
+            "Retorne a resposta ESTRITAMENTE em formato JSON com o seguinte schema:\n"
             "{\n"
-            '  "titulo": "Título objetivo com marca, modelo e atributo principal (max 70 chars)",\n'
-            '  "descricao": "Descrição completa, organizada em tópicos: Visão Geral, Estado Real / Detalhes Visíveis, O que Acompanha e Condições de Retirada/Envio",\n'
+            '  "titulo": "Título objetivo e atrativo com marca, modelo e atributo principal (max 70 chars)",\n'
+            '  "descricao": "Texto completo da descrição seguindo a estrutura de tópicos acima",\n'
             '  "preco_usado": 0.00,\n'
             '  "preco_novo": 0.00,\n'
             '  "preco_aluguel": 0.00\n'
@@ -341,11 +477,19 @@ class CopywritingService:
     ) -> Dict[str, Any]:
         candidate_models = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-flash-latest"]
         prompt = (
-            "Crie um anúncio honesto e atraente para venda de item usado no Brasil. "
-            f"Dados: Visão: {json.dumps(vision_data, ensure_ascii=False)}, "
-            f"Mercado: {json.dumps(market_data, ensure_ascii=False)}, "
-            f"Obs Vendedor: {observacoes}. "
-            "Retorne estritamente JSON com: titulo, descricao, preco_usado (float), preco_novo (float), preco_aluguel (float)."
+            "Você é um redator profissional e especialista técnico em anúncios de desapego e marketplace no Brasil.\n"
+            "Crie um anúncio de altíssima qualidade com TRANSPARÊNCIA TOTAL e FICHA TÉCNICA PRECISA do modelo identificado.\n\n"
+            f"Dados Visuais: {json.dumps(vision_data, ensure_ascii=False)}\n"
+            f"Pesquisa de Mercado: {json.dumps(market_data, ensure_ascii=False)}\n"
+            f"Observações do Vendedor: {observacoes}\n\n"
+            "A descrição DEVE conter:\n"
+            "- 📦 Visão Geral\n"
+            "- 📋 Ficha Técnica & Especificações Exatas (com dados reais e detalhados do modelo identificado)\n"
+            "- 🔍 Transparência Total (Estado Real & Detalhes Visíveis)\n"
+            "- 🎁 Itens Inclusos\n"
+            "- 🚚 Condições de Retirada & Envio\n\n"
+            "Retorne ESTRITAMENTE em formato JSON com as chaves:\n"
+            "titulo (string até 70 chars), descricao (string completa), preco_usado (float), preco_novo (float), preco_aluguel (float)."
         )
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
@@ -377,27 +521,38 @@ class CopywritingService:
     ) -> Dict[str, Any]:
         prod = vision_data.get('produto_identificado', 'Produto em Desapego')
         marca = vision_data.get('marca', '')
+        modelo = vision_data.get('modelo', '')
         defeitos = vision_data.get('defeitos_visiveis', 'Em bom estado geral com marcas leves de uso.')
         acessorios = vision_data.get('acessorios_visiveis', 'Itens exibidos nas fotos.')
+        specs = vision_data.get('especificacoes_visiveis', 'Conforme exibido nas imagens.')
 
         preco_novo = market_data.get('preco_novo_estimado') or 250.00
         preco_usado = market_data.get('preco_usado_medio') or round(preco_novo * 0.6, 2)
         preco_aluguel = round(preco_usado * 0.15, 2)
 
         descricao = (
-            f"📦 **{prod}**\n\n"
-            f"🔹 **Marca/Modelo:** {marca}\n"
-            f"🔹 **Estado de Conservação:** {vision_data.get('estado_conservacao', 'Bom estado').capitalize()}\n\n"
-            f"🔍 **Detalhes e Estado Real (Transparência Total):**\n"
+            f"📦 **Visão Geral:**\n"
+            f"{prod} ({marca} {modelo}). Excelente oportunidade para aquisição com ótimo custo-benefício.\n\n"
+            f"📋 **Ficha Técnica & Especificações:**\n"
+            f"• Marca: {marca}\n"
+            f"• Modelo: {modelo}\n"
+            f"• Estado: {vision_data.get('estado_conservacao', 'Bom estado').capitalize()}\n"
+            f"• Especificações: {specs}\n\n"
+            f"🔍 **Transparência Total (Estado Real & Detalhes Visíveis):**\n"
             f"{defeitos}\n\n"
             f"🎁 **Itens Inclusos:**\n"
             f"{acessorios}\n\n"
             f"{'📝 Observação do Vendedor: ' + observacoes if observacoes else ''}\n\n"
+            f"🚚 **Condições de Retirada & Envio:**\n"
+            f"Retirada em mãos a combinar ou envio seguro para todo o Brasil. Pagamento via PIX.\n\n"
             f"💬 *Fique à vontade para tirar dúvidas e negociar através dos nossos canais de contato!*"
         )
 
+        titulo_parts = [p for p in [prod, marca, modelo] if p and p.lower() not in ['genérica / não identificada', 'padrão']]
+        titulo = " ".join(titulo_parts)[:70] if titulo_parts else f"{prod} - {marca}".strip(" -")
+
         return {
-            "titulo": f"{prod} - {marca}".strip(" -"),
+            "titulo": titulo,
             "descricao": descricao,
             "preco_usado": preco_usado,
             "preco_novo": preco_novo,
@@ -444,7 +599,7 @@ class NotificationService:
 class AIOrchestrator:
     """
     Orquestrador da Chain of Thought de IA:
-    1. Visão -> 2. Pesquisa de Mercado -> 3. Copywriting -> 4. Notificação
+    1. Visão Computacional -> 2. Pesquisa de Mercado & Ficha Técnica -> 3. Copywriting Técnico -> 4. Notificação
     """
     @classmethod
     def process_item(cls, item_id: int) -> Dict[str, Any]:
@@ -458,11 +613,12 @@ class AIOrchestrator:
         # Passo 1: Visão Computacional
         vision_result = VisionService.analyze_item_images(item)
 
-        # Passo 2: Pesquisa de Mercado
-        produto_identificado = vision_result.get('produto_identificado') or item.titulo
-        market_result = MarketSearchService.search_market_prices(produto_identificado)
+        # Passo 2: Construção da Query Otimizada e Pesquisa de Mercado
+        search_query = MarketSearchService.build_search_query(vision_result, item.titulo)
+        logger.info(f"Query otimizada construída para busca de mercado: '{search_query}'")
+        market_result = MarketSearchService.search_market_prices(search_query)
 
-        # Passo 3: Copywriting
+        # Passo 3: Copywriting com Ficha Técnica Exata e Transparência Total
         copy_result = CopywritingService.generate_listing_copy(
             vision_data=vision_result,
             market_data=market_result,
@@ -508,5 +664,6 @@ class AIOrchestrator:
             "item_id": item.id,
             "titulo": item.titulo,
             "preco_usado": str(item.preco_usado),
-            "categoria": item.categoria
+            "categoria": item.categoria,
+            "urls_referencia": item.urls_referencia
         }

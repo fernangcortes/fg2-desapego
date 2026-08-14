@@ -92,12 +92,18 @@ def format_for_facebook(item: Item, base_url: str = "") -> str:
     preco = get_formatted_price(item.preco_usado)
     estado = item.get_estado_conservacao_display()
 
+    descricao_limpa = item.descricao_efetiva.replace('**', '').replace('##', '').replace('###', '').strip()
+    if len(descricao_limpa) > 900:
+        descricao_exibida = f"{descricao_limpa[:850]}..."
+    else:
+        descricao_exibida = descricao_limpa
+
     texto = (
         f"🔥 DESAPEGO: {item.titulo}\n\n"
         f"💲 Valor: {preco}\n"
         f"✨ Estado: {estado}\n\n"
-        f"📝 Descrição:\n"
-        f"{item.descricao_efetiva[:350]}...\n\n"
+        f"📝 Descrição & Especificações:\n"
+        f"{descricao_exibida}\n\n"
     )
 
     if item.defeitos_visiveis:

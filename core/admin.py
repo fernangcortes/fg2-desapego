@@ -161,11 +161,58 @@ class ItemAdmin(admin.ModelAdmin):
 
     def urls_referencia_formatadas(self, obj):
         if not obj.urls_referencia:
-            return "Nenhuma URL de referência registrada."
-        links = []
+            return format_html('<span style="color: #94a3b8; font-style: italic; font-size: 12px;">Nenhuma URL de referência registrada. Execute a pipeline de IA para pesquisar.</span>')
+
+        items_html = []
         for url in obj.urls_referencia:
-            links.append(f'<li><a href="{url}" target="_blank" rel="noopener noreferrer">{url}</a></li>')
-        return format_html('<ul style="margin: 0; padding-left: 18px;">{}</ul>', format_html("".join(links)))
+            if not isinstance(url, str) or not url.startswith("http"):
+                continue
+
+            url_lower = url.lower()
+            if "mercadolivre.com" in url_lower:
+                badge_bg = "#fef08a"
+                badge_color = "#854d0e"
+                label = "Mercado Livre"
+                icon = "🟡"
+            elif "amazon.com" in url_lower:
+                badge_bg = "#ffedd5"
+                badge_color = "#9a3412"
+                label = "Amazon Brasil"
+                icon = "🟠"
+            elif "kabum.com" in url_lower:
+                badge_bg = "#dbeafe"
+                badge_color = "#1e40af"
+                label = "KaBuM!"
+                icon = "🔵"
+            elif "magazineluiza.com" in url_lower or "magalu" in url_lower:
+                badge_bg = "#e0e7ff"
+                badge_color = "#3730a3"
+                label = "Magalu"
+                icon = "🟣"
+            elif "google.com" in url_lower:
+                badge_bg = "#f1f5f9"
+                badge_color = "#334155"
+                label = "Google Busca"
+                icon = "🔍"
+            else:
+                badge_bg = "#f0fdf4"
+                badge_color = "#166534"
+                label = "Referência Web / Fabricante"
+                icon = "🌐"
+
+            items_html.append(
+                f'<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">'
+                f'<span style="background-color: {badge_bg}; color: {badge_color}; padding: 2px 7px; border-radius: 6px; font-weight: 700; font-size: 11px; white-space: nowrap;">{icon} {label}</span>'
+                f'<a href="{url}" target="_blank" rel="noopener noreferrer" style="color: #0284c7; text-decoration: none; font-size: 12px; word-break: break-all;" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">'
+                f'{url} ↗'
+                f'</a>'
+                f'</div>'
+            )
+
+        if not items_html:
+            return format_html('<span style="color: #94a3b8; font-style: italic; font-size: 12px;">Nenhuma URL válida registrada.</span>')
+
+        return format_html('<div style="background: #f8fafc; padding: 10px 14px; border-radius: 8px; border: 1px solid #e2e8f0;">{}</div>', format_html("".join(items_html)))
     urls_referencia_formatadas.short_description = "Links de Referência (Clicáveis)"
 
     @admin.action(description="🤖 Processar selecionados com IA (Visão + Mercado + Copy)")
