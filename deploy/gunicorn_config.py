@@ -10,8 +10,8 @@ bind = "unix:/tmp/gunicorn_desapego.sock"
 workers = multiprocessing.cpu_count() * 2 + 1
 worker_class = "sync"
 
-# Timeouts (60 segundos para dar tempo às chamadas de IA)
-timeout = 60
+# Timeouts (180 segundos para dar tempo às chamadas completas da pipeline de IA)
+timeout = 180
 keepalive = 5
 
 # Logs
