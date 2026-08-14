@@ -1,6 +1,6 @@
 /**
- * Django Admin Minimal Hacker Terminal - Hub de Desapego
- * Stream de logs leve, limpo, estilo hacker/CLI e 100% arrastável (draggable).
+ * Django Admin Transparent Hacker Stream - Hub de Desapego
+ * Stream de logs 100% transparente, sem box, movível, com resize via wheel e fechar ao clicar fora.
  */
 
 (function () {
@@ -17,25 +17,28 @@
         isDragging: false,
         dragOffsetX: 0,
         dragOffsetY: 0,
+        currentFontSize: 11.5,
 
         init() {
             this.buildDOM();
             this.bindEvents();
             this.initDraggable();
-            this.restorePosition();
+            this.initWheelResize();
+            this.initClickOutside();
+            this.restoreGeometry();
         },
 
         buildDOM() {
             if (document.getElementById('admin-ai-terminal-root')) return;
 
-            // 1. Movable Terminal Root
+            // 1. Transparent Movable Root
             const terminal = document.createElement('div');
             terminal.id = 'admin-ai-terminal-root';
             terminal.className = 'terminal-hidden';
             terminal.innerHTML = `
                 <div class="ai-terminal-header" id="ai-term-header">
                     <div class="ai-terminal-drag-label">
-                        <span class="grip-icon">⠿</span>
+                        <span class="grip-icon" title="Arraste para mover">⠿</span>
                         <span class="terminal-status-dot" id="ai-term-dot"></span>
                         <span class="terminal-name" id="ai-term-name">ai-stream</span>
                     </div>
@@ -51,7 +54,7 @@
             `;
             document.body.appendChild(terminal);
 
-            // 2. Minimized Floating Chip
+            // 2. Minimized Transparent Chip
             const pill = document.createElement('div');
             pill.id = 'admin-ai-terminal-pill';
             pill.className = 'pill-hidden';
@@ -83,7 +86,10 @@
                 e.stopPropagation();
                 this.clear();
             });
-            this.pillEl?.addEventListener('click', () => this.restore());
+            this.pillEl?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.restore();
+            });
 
             // Global click for row AI action buttons
             document.addEventListener('click', (e) => {
@@ -124,12 +130,71 @@
                 });
             }
 
-            // Keyboard Escape
+            // Keyboard Escape to close
             document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' && this.isOpen && !this.isMinimized) {
-                    this.minimize();
+                if (e.key === 'Escape' && this.isOpen) {
+                    this.close();
                 }
             });
+        },
+
+        /* Click outside terminal closes it */
+        initClickOutside() {
+            document.addEventListener('pointerdown', (e) => {
+                if (!this.isOpen || this.isMinimized) return;
+
+                const isInsideTerminal = this.rootEl.contains(e.target);
+                const isClickOnAiBtn = e.target.closest('.admin-ai-action-btn, #admin-ai-terminal-pill');
+
+                if (!isInsideTerminal && !isClickOnAiBtn) {
+                    this.close();
+                }
+            });
+        },
+
+        /* Wheel resize on hover */
+        initWheelResize() {
+            const header = document.getElementById('ai-term-header');
+
+            const handleWheelResize = (e) => {
+                // Resize if scrolling over header OR if Ctrl/Alt is held anywhere on terminal
+                const isOverHeader = e.target.closest('.ai-terminal-header');
+                const hasModifier = e.ctrlKey || e.altKey || e.shiftKey;
+
+                if (isOverHeader || hasModifier) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    const delta = e.deltaY < 0 ? 1 : -1;
+                    const rect = this.rootEl.getBoundingClientRect();
+
+                    let newWidth = rect.width + (delta * 24);
+                    let newHeight = rect.height + (delta * 16);
+                    let newFont = this.currentFontSize + (delta * 0.4);
+
+                    // Clamp values
+                    newWidth = Math.max(220, Math.min(newWidth, window.innerWidth - 40));
+                    newHeight = Math.max(90, Math.min(newHeight, window.innerHeight - 50));
+                    newFont = Math.max(9, Math.min(newFont, 16));
+
+                    this.rootEl.style.width = `${newWidth}px`;
+                    this.rootEl.style.height = `${newHeight}px`;
+                    this.rootEl.style.fontSize = `${newFont}px`;
+                    this.currentFontSize = newFont;
+
+                    this.saveGeometry();
+                }
+            };
+
+            this.rootEl.addEventListener('wheel', handleWheelResize, { passive: false });
+
+            // Listen to manual mouse resize to persist dimensions
+            const resizeObserver = new ResizeObserver(() => {
+                if (this.isOpen && !this.isMinimized && !this.isDragging) {
+                    this.saveGeometry();
+                }
+            });
+            resizeObserver.observe(this.rootEl);
         },
 
         /* Draggable System */
@@ -179,24 +244,46 @@
                 document.removeEventListener('mousemove', onMouseMove);
                 document.removeEventListener('mouseup', onMouseUp);
 
-                // Save position
-                const rect = this.rootEl.getBoundingClientRect();
-                localStorage.setItem('hub_ai_term_pos', JSON.stringify({ left: rect.left, top: rect.top }));
+                this.saveGeometry();
             };
 
             header.addEventListener('mousedown', onMouseDown);
         },
 
-        restorePosition() {
+        saveGeometry() {
+            const rect = this.rootEl.getBoundingClientRect();
+            const geometry = {
+                left: rect.left,
+                top: rect.top,
+                width: rect.width,
+                height: rect.height,
+                fontSize: this.currentFontSize
+            };
             try {
-                const saved = localStorage.getItem('hub_ai_term_pos');
+                localStorage.setItem('hub_ai_term_geometry', JSON.stringify(geometry));
+            } catch (_) {}
+        },
+
+        restoreGeometry() {
+            try {
+                const saved = localStorage.getItem('hub_ai_term_geometry');
                 if (saved) {
-                    const { left, top } = JSON.parse(saved);
-                    if (left > 0 && left < window.innerWidth - 100 && top > 0 && top < window.innerHeight - 100) {
-                        this.rootEl.style.left = `${left}px`;
-                        this.rootEl.style.top = `${top}px`;
+                    const geo = JSON.parse(saved);
+                    if (geo.left > 0 && geo.left < window.innerWidth - 60 && geo.top > 0 && geo.top < window.innerHeight - 40) {
+                        this.rootEl.style.left = `${geo.left}px`;
+                        this.rootEl.style.top = `${geo.top}px`;
                         this.rootEl.style.right = 'auto';
                         this.rootEl.style.bottom = 'auto';
+                    }
+                    if (geo.width >= 200 && geo.width <= window.innerWidth) {
+                        this.rootEl.style.width = `${geo.width}px`;
+                    }
+                    if (geo.height >= 80 && geo.height <= window.innerHeight) {
+                        this.rootEl.style.height = `${geo.height}px`;
+                    }
+                    if (geo.fontSize && geo.fontSize >= 9 && geo.fontSize <= 18) {
+                        this.currentFontSize = geo.fontSize;
+                        this.rootEl.style.fontSize = `${geo.fontSize}px`;
                     }
                 }
             } catch (_) {}

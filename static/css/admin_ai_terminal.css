@@ -1,35 +1,37 @@
 /* ==========================================================================
-   Admin Minimal Hacker Terminal - Hub de Desapego
-   Terminal clean, sem box pesado, movível (drag & drop), estilo hacker/CLI.
+   Admin Pure Hacker Stream - Hub de Desapego
+   100% Transparente, sem box, sem bordas/margens azuis, puro texto e ícones flutuantes.
    ========================================================================== */
 
-/* 1. Movable Minimal Floating Terminal */
+/* 1. Transparent Floating Terminal Root */
 #admin-ai-terminal-root {
     position: fixed;
-    bottom: 20px;
-    right: 20px;
-    width: 480px;
-    max-width: calc(100vw - 30px);
-    min-width: 320px;
-    height: 280px;
-    min-height: 160px;
-    max-height: calc(100vh - 40px);
-    background: rgba(11, 15, 25, 0.94);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 8px;
-    box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(16, 185, 129, 0.12);
+    bottom: 24px;
+    right: 24px;
+    width: 440px;
+    max-width: calc(100vw - 20px);
+    min-width: 240px;
+    height: 220px;
+    min-height: 100px;
+    max-height: calc(100vh - 30px);
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0;
+    box-shadow: none !important;
     z-index: 99999;
     display: flex;
     flex-direction: column;
     overflow: hidden;
     font-family: ui-monospace, "SF Mono", "JetBrains Mono", "Fira Code", Consolas, Menlo, monospace;
     font-size: 11.5px;
-    line-height: 1.5;
-    color: #cbd5e1;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    line-height: 1.45;
+    color: #e2e8f0;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
     resize: both;
-    transition: opacity 0.2s ease, transform 0.2s ease;
+    padding: 0;
+    margin: 0;
+    transition: opacity 0.15s ease;
 }
 
 #admin-ai-terminal-root.terminal-hidden {
@@ -41,17 +43,16 @@
 }
 
 #admin-ai-terminal-root.is-dragging {
-    opacity: 0.88;
+    opacity: 0.75;
     user-select: none;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(16, 185, 129, 0.3);
     cursor: grabbing;
 }
 
-/* 2. Minimalist Header & Drag Handle */
+/* 2. Transparent Header & Drag Handle */
 .ai-terminal-header {
-    background: rgba(15, 23, 42, 0.7);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    padding: 6px 12px;
+    background: transparent !important;
+    border: none !important;
+    padding: 2px 0 6px 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -63,16 +64,17 @@
 .ai-terminal-drag-label {
     display: flex;
     align-items: center;
-    gap: 7px;
+    gap: 6px;
     color: #10b981;
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.3px;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 1px rgba(0, 0, 0, 0.8);
 }
 
 .ai-terminal-drag-label .grip-icon {
-    color: #475569;
-    font-size: 12px;
+    color: #64748b;
+    font-size: 11px;
     cursor: grab;
 }
 
@@ -86,18 +88,21 @@
     border-radius: 50%;
     background: #10b981;
     display: inline-block;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
 }
 
 .ai-terminal-drag-label .terminal-status-dot.is-running {
     background: #a855f7;
+    box-shadow: 0 0 8px rgba(168, 85, 247, 0.7);
     animation: hacker-pulse 1s infinite alternate ease-in-out;
 }
 
 .ai-terminal-drag-label .terminal-status-dot.is-error {
     background: #ef4444;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.7);
 }
 
-/* Clean text-based actions */
+/* Clean text-based actions (no box, no bg) */
 .ai-terminal-actions {
     display: flex;
     align-items: center;
@@ -105,43 +110,43 @@
 }
 
 .ai-terminal-action-btn {
-    background: transparent;
-    border: none;
+    background: transparent !important;
+    border: none !important;
     color: #64748b;
     font-family: inherit;
     font-size: 11px;
     cursor: pointer;
-    padding: 2px 4px;
+    padding: 0 2px;
     line-height: 1;
-    border-radius: 3px;
-    transition: color 0.15s ease, background 0.15s ease;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+    transition: color 0.15s ease, transform 0.12s ease;
 }
 
 .ai-terminal-action-btn:hover {
     color: #f1f5f9;
-    background: rgba(255, 255, 255, 0.06);
+    transform: scale(1.1);
 }
 
 .ai-terminal-action-btn.btn-close:hover {
     color: #ef4444;
 }
 
-/* 3. Log Stream Body */
+/* 3. Pure Transparent Log Body */
 .ai-terminal-body {
     flex: 1;
     overflow-y: auto;
-    padding: 8px 12px;
-    background: transparent;
+    padding: 2px 0 0 0;
+    background: transparent !important;
     display: flex;
     flex-direction: column;
     gap: 3px;
     scroll-behavior: smooth;
 }
 
-/* Minimal Scrollbar */
+/* Discreet Minimal Scrollbar */
 .ai-terminal-body::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
+    width: 3px;
+    height: 3px;
 }
 
 .ai-terminal-body::-webkit-scrollbar-track {
@@ -149,21 +154,22 @@
 }
 
 .ai-terminal-body::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(148, 163, 184, 0.25);
     border-radius: 2px;
 }
 
 .ai-terminal-body::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(148, 163, 184, 0.45);
 }
 
-/* 4. Stream Log Lines */
+/* 4. Stream Log Rows */
 .term-row {
     display: flex;
     align-items: baseline;
     gap: 6px;
-    line-height: 1.45;
+    line-height: 1.4;
     word-break: break-word;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 0 1px rgba(0, 0, 0, 0.8);
 }
 
 .term-time {
@@ -197,14 +203,14 @@
 }
 
 .term-highlight {
-    color: #f1f5f9;
+    color: #f8fafc;
     font-weight: 600;
 }
 
 .term-sub {
     color: #94a3b8;
-    margin-left: 14px;
-    font-size: 11px;
+    margin-left: 12px;
+    font-size: 10.5px;
 }
 
 .term-success {
@@ -219,49 +225,33 @@
     color: #38bdf8;
 }
 
-/* Blinking Cursor */
-.term-cursor {
-    display: inline-block;
-    color: #10b981;
-    font-weight: 700;
-    animation: hacker-blink 0.9s infinite steps(2, start);
-}
-
-@keyframes hacker-blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0; }
-}
-
 @keyframes hacker-pulse {
     0% { opacity: 0.4; transform: scale(0.85); }
     100% { opacity: 1; transform: scale(1.15); }
 }
 
-/* 5. Minimalist Floating Chip (when minimized) */
+/* 5. Minimalist Transparent Chip (when minimized) */
 #admin-ai-terminal-pill {
     position: fixed;
     bottom: 16px;
     right: 16px;
-    background: rgba(11, 15, 25, 0.9);
-    border: 1px solid rgba(16, 185, 129, 0.25);
-    border-radius: 6px;
-    padding: 5px 10px;
+    background: transparent !important;
+    border: none !important;
+    padding: 4px 8px;
     display: inline-flex;
     align-items: center;
-    gap: 7px;
-    color: #cbd5e1;
+    gap: 6px;
+    color: #94a3b8;
     font-family: ui-monospace, "SF Mono", Consolas, monospace;
     font-size: 11px;
     cursor: pointer;
     z-index: 99998;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(8px);
-    transition: all 0.15s ease;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+    transition: color 0.15s ease, transform 0.15s ease;
 }
 
 #admin-ai-terminal-pill:hover {
-    border-color: #10b981;
-    color: #f1f5f9;
+    color: #10b981;
     transform: translateY(-1px);
 }
 
@@ -274,6 +264,7 @@
     height: 6px;
     border-radius: 50%;
     background: #10b981;
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
 }
 
 #admin-ai-terminal-pill .pill-dot.is-running {
