@@ -256,3 +256,76 @@ class AIEngineServicesTests(TestCase):
         data = response_auth.json()
         self.assertTrue(data.get('success'))
         self.assertIn('slug', data)
+
+    def test_infer_category(self):
+        self.assertEqual(MarketSearchService.infer_category("Violão Yamaha C40"), Item.Categoria.INSTRUMENTOS)
+        self.assertEqual(MarketSearchService.infer_category("Guitarra Fender Stratocaster"), Item.Categoria.INSTRUMENTOS)
+        self.assertEqual(MarketSearchService.infer_category("Smartphone iPhone 13 Pro 128GB"), Item.Categoria.ELETRONICOS)
+        self.assertEqual(MarketSearchService.infer_category("Fone Bluetooth JBL Tune 510BT"), Item.Categoria.ELETRONICOS)
+        self.assertEqual(MarketSearchService.infer_category("Furadeira de Impacto Bosch 650W"), Item.Categoria.FERRAMENTAS)
+        self.assertEqual(MarketSearchService.infer_category("Cafeteira Nespresso Essenza Mini"), Item.Categoria.ELETRODOMESTICOS)
+        self.assertEqual(MarketSearchService.infer_category("Cadeira Gamer ThunderX3"), Item.Categoria.MOVEIS)
+        self.assertEqual(MarketSearchService.infer_category("Tênis Nike Air Max 90"), Item.Categoria.VESTUARIO)
+        self.assertEqual(MarketSearchService.infer_category("Bicicleta Caloi Aro 29"), Item.Categoria.ESPORTES)
+        self.assertEqual(MarketSearchService.infer_category("Box Harry Potter Edição Especial"), Item.Categoria.LIVROS)
+
+    def test_search_internet_products_empty(self):
+        res = MarketSearchService.search_internet_products("")
+        self.assertFalse(res["success"])
+        self.assertEqual(res["total"], 0)
+
+        res_short = MarketSearchService.search_internet_products("a")
+        self.assertFalse(res_short["success"])
+        self.assertEqual(res_short["total"], 0)
+
+    @patch('requests.post')
+    def test_search_internet_products_mock(self, mock_post):
+        # Mock do shopping e organic
+        mock_resp_shop = MagicMock()
+        mock_resp_shop.status_code = 200
+        mock_resp_shop.json.return_value = {
+            "shopping": [
+                {
+                    "title": "Violão Acústico Yamaha C40MII Nylon",
+                    "price": "R$ 799,00",
+                    "source": "Mercado Livre",
+                    "link": "https://www.mercadolivre.com.br/violao-yamaha-c40",
+                    "imageUrl": "https://http2.mlstatic.com/img.jpg"
+                },
+                {
+                    "title": "Violão Yamaha C40 II Clássico",
+                    "price": "R$ 899,00",
+                    "source": "Amazon Brasil",
+                    "link": "https://www.amazon.com.br/dp/B0002F58TG",
+                    "imageUrl": "https://amazon.com/img.jpg"
+                }
+            ]
+        }
+
+        mock_post.return_value = mock_resp_shop
+
+        with override_settings(AI_CONFIG={'SERPER_API_KEY': 'fake_serper_key'}):
+            res = MarketSearchService.search_internet_products("Violao Yamaha C40")
+            self.assertTrue(res["success"])
+            self.assertGreaterEqual(res["total"], 2)
+            self.assertEqual(res["suggestion"]["categoria"], Item.Categoria.INSTRUMENTOS)
+            self.assertIsNotNone(res["suggestion"]["preco_novo"])
+            self.assertIsNotNone(res["suggestion"]["preco_usado"])
+            self.assertTrue(len(res["suggestion"]["urls"]) > 0)
+
+    def test_search_internet_products_view(self):
+        # Query vazia
+        resp_empty = self.client.get('/ai/search-title/?q=')
+        self.assertEqual(resp_empty.status_code, 200)
+        data_empty = resp_empty.json()
+        self.assertFalse(data_empty["success"])
+
+        # Query válida com fallback
+        resp = self.client.get('/ai/search-title/?q=Violao%20Yamaha%20C40')
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data["success"])
+        self.assertEqual(data["query"], "Violao Yamaha C40")
+        self.assertIn("suggestion", data)
+        self.assertIn("categoria", data["suggestion"])
+

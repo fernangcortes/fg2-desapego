@@ -3,7 +3,7 @@ from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.http import JsonResponse
 from core.models import Item
-from .services import AIOrchestrator, SerpApiService
+from .services import AIOrchestrator, SerpApiService, MarketSearchService
 
 
 @staff_member_required
@@ -48,3 +48,23 @@ def serpapi_quota_view(request):
     """
     quota = SerpApiService.get_account_quota()
     return JsonResponse(quota)
+
+
+def search_internet_products_view(request):
+    """
+    Pesquisa em tempo real produtos e preços na internet correspondentes ao termo digitado no título.
+    Usado no Django Admin e no formulário de Upload Rápido.
+    """
+    query = request.GET.get('q', '').strip()
+    if not query or len(query) < 2:
+        return JsonResponse({
+            "success": False,
+            "query": query,
+            "total": 0,
+            "items": [],
+            "suggestion": {}
+        })
+
+    resultado = MarketSearchService.search_internet_products(query)
+    return JsonResponse(resultado)
+

@@ -203,7 +203,7 @@
         return cookieValue || '';
     }
 
-    function showAdminSubtleToast(message, isError = false, customIcon = '') {
+    function showAdminSubtleToast(message, isError = false, customIconSvg = '') {
         let container = document.getElementById('admin-subtle-toast-container');
         if (!container) {
             container = document.createElement('div');
@@ -211,11 +211,14 @@
             document.body.appendChild(container);
         }
 
-        const icon = isError ? '⚠️' : (customIcon || '✅');
+        const iconSvg = isError 
+            ? '<svg viewBox="0 0 24 24" style="width:15px; height:15px; stroke:#f87171; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>'
+            : (customIconSvg || '<svg viewBox="0 0 24 24" style="width:15px; height:15px; stroke:#4ade80; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;"><polyline points="20 6 9 17 4 12"></polyline></svg>');
+
         const toast = document.createElement('div');
         toast.className = `admin-subtle-toast ${isError ? 'toast-error' : ''}`;
         toast.innerHTML = `
-            <span>${icon}</span>
+            ${iconSvg}
             <span>${message}</span>
         `;
 
@@ -345,15 +348,17 @@
             <div class="admin-md-toolbar">
                 <div class="admin-md-tabs">
                     <button type="button" class="admin-md-tab-btn is-active" data-mode="rendered">
-                        <span>👁️ Visual Formatado</span>
+                        <svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                        <span>Visual Formatado</span>
                     </button>
                     <button type="button" class="admin-md-tab-btn" data-mode="raw">
-                        <span>✏️ Código / Markdown</span>
+                        <svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;"><path d="m18 2 4 4-14 14H4v-4L18 2z"/></svg>
+                        <span>Código / Markdown</span>
                     </button>
                 </div>
                 <div style="display: flex; align-items: center; gap: 6px;">
                     <button type="button" class="admin-md-copy-btn" id="btn-copy-ia-to-manual" title="Copiar este texto da IA para o campo 'Descrição Manual / Final' para poder personalizá-lo">
-                        <span>📋</span>
+                        <svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
                         <span>Copiar para Descrição Manual</span>
                     </button>
                 </div>

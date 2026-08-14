@@ -2,6 +2,10 @@
 
 {% block title %}Upload Rápido - Hub de Desapego{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="/static/css/admin_title_search.css">
+{% endblock %}
+
 {% block content %}
 <div class="max-w-xl mx-auto space-y-6">
     <!-- Header da Página -->
@@ -180,6 +184,7 @@
 
 {% block extra_js %}
 <script src="/static/js/photo-draft-storage.js"></script>
+<script src="/static/js/admin_title_search.js"></script>
 <script>
     const cameraInput = document.getElementById('cameraInput');
     const galleryInput = document.getElementById('galleryInput');

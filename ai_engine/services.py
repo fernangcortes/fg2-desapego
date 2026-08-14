@@ -871,6 +871,313 @@ class MarketSearchService:
         return {"preco_novo": preco_novo, "preco_usado": preco_usado}
 
     @classmethod
+    def infer_category(cls, text: str) -> str:
+        """
+        Deduz automaticamente a categoria mais apropriada do modelo Item.Categoria
+        a partir do nome do produto, modelo ou descrição pesquisada.
+        """
+        if not text:
+            return Item.Categoria.OUTROS
+
+        t = text.lower()
+
+        # Instrumentos Musicais
+        if any(w in t for w in [
+            'violao', 'violão', 'guitarra', 'baixo', 'contrabaixo', 'teclado', 'piano', 'ukulele',
+            'bateria', 'prato', 'afinador', 'pedal', 'pedaleira', 'encordoamento', 'saxofone',
+            'flauta', 'microfone', 'shure', 'sennheiser', 'amplificador', 'cabo p10', 'cavaquinho',
+            'sanfona', 'acordeon', 'tarraxa', 'pedalboard', 'gaita', 'trompete', 'clarinete', 'yamaha c40', 'yamaha'
+        ]):
+            return Item.Categoria.INSTRUMENTOS
+
+        # Eletrônicos & Informática
+        if any(w in t for w in [
+            'fone', 'headphone', 'headset', 'celular', 'smartphone', 'iphone', 'galaxy', 'xiaomi',
+            'motorola', 'notebook', 'laptop', 'computador', 'pc gamer', 'tablet', 'ipad', 'monitor',
+            'mouse', 'teclado mecanico', 'teclado sem fio', 'smartwatch', 'apple watch', 'carregador',
+            'cabo usb', 'hd externo', 'ssd', 'placa de video', 'rtx', 'gtx', 'geforce', 'processador',
+            'ryzen', 'intel core', 'roteador', 'roteador wi-fi', 'tv ', 'smart tv', 'camera', 'câmera',
+            'drone', 'gopro', 'kindle', 'alexa', 'echo dot', 'soundbar', 'jbl', 'airpods'
+        ]):
+            return Item.Categoria.ELETRONICOS
+
+        # Ferramentas e Casa
+        if any(w in t for w in [
+            'furadeira', 'parafusadeira', 'serra', 'martelete', 'lixadeira', 'trena', 'alicate',
+            'chave de fenda', 'chave philips', 'esmerilhadeira', 'multimetro', 'multímetro',
+            'ferro de solda', 'makita', 'bosch', 'dewalt', 'black+decker', 'black decker', 'dremel',
+            'compressor', 'nivel a laser', 'nível a laser', 'bancada', 'morsa', 'soprador termico'
+        ]):
+            return Item.Categoria.FERRAMENTAS
+
+        # Eletrodomésticos
+        if any(w in t for w in [
+            'cafeteira', 'air fryer', 'fritadeira', 'liquidificador', 'batedeira', 'microondas',
+            'micro-ondas', 'forno', 'aspirador', 'ventilador', 'ferro de passar', 'geladeira',
+            'refrigerador', 'fogao', 'fogão', 'cooktop', 'purificador', 'sanduicheira', 'mixer',
+            'torradeira', 'lavadora', 'lava e seca', 'adega', 'climatizador', 'ar-condicionado'
+        ]):
+            return Item.Categoria.ELETRODOMESTICOS
+
+        # Móveis e Decoração
+        if any(w in t for w in [
+            'cadeira', 'cadeira gamer', 'cadeira de escritorio', 'mesa', 'escrivaninha', 'sofa', 'sofá',
+            'estante', 'rack', 'poltrona', 'armario', 'armário', 'comoda', 'cômoda', 'cama', 'colchao',
+            'colchão', 'criado mudo', 'mesa de cabeceira', 'prateleira', 'suporte articulado', 'lustre', 'luminaria'
+        ]):
+            return Item.Categoria.MOVEIS
+
+        # Roupas e Acessórios
+        if any(w in t for w in [
+            'tenis', 'tênis', 'sapato', 'bota', 'sandalia', 'sandália', 'chinelo', 'camiseta',
+            'camisa', 'jaqueta', 'casaco', 'moletom', 'calca', 'calça', 'bermuda', 'shorts',
+            'vestido', 'saia', 'bolsa', 'mochila', 'mala', 'relogio', 'relógio', 'oculos', 'óculos',
+            'bone', 'boné', 'cinto', 'carteira'
+        ]):
+            return Item.Categoria.VESTUARIO
+
+        # Esportes e Lazer
+        if any(w in t for w in [
+            'bicicleta', 'bike', 'esteira', 'halteres', 'halter', 'anilha', 'barra fixa', 'bola',
+            'raquete', 'patins', 'skate', 'longboard', 'prancha', 'surf', 'barraca', 'camping',
+            'saco de dormir', 'suplemento', 'whey', 'creatina', 'kimono', 'capacete bike'
+        ]):
+            return Item.Categoria.ESPORTES
+
+        # Livros e Colecionáveis
+        if any(w in t for w in [
+            'livro', 'box', 'quadrinhos', 'manga', 'mangá', 'gibi', 'revista', 'enciclopedia',
+            'hq', 'card game', 'board game', 'action figure', 'colecionavel', 'colecionável',
+            'harry potter', 'tolkien', 'senhor dos aneis', 'star wars', 'capa dura', 'literatura'
+        ]):
+            return Item.Categoria.LIVROS
+
+        return Item.Categoria.OUTROS
+
+    @classmethod
+    def search_internet_products(cls, query: str) -> Dict[str, Any]:
+        """
+        Pesquisa ao vivo na internet produtos correspondentes ao termo digitado no título.
+        Retorna lista de anúncios e produtos do catálogo nacional com preços em R$, imagens, links e sugestões.
+        """
+        query_clean = (query or '').strip()
+        if len(query_clean) < 2:
+            return {
+                "success": False,
+                "query": query_clean,
+                "total": 0,
+                "items": [],
+                "suggestion": {}
+            }
+
+        api_config = getattr(settings, 'AI_CONFIG', {})
+        serper_key = api_config.get('SERPER_API_KEY')
+        tavily_key = api_config.get('TAVILY_API_KEY')
+
+        items: List[Dict[str, Any]] = []
+        found_prices_new: List[float] = []
+        found_prices_used: List[float] = []
+        reference_urls: List[str] = []
+        all_snippets: List[str] = []
+
+        def clean_price_val(raw_price: Any) -> Optional[float]:
+            if raw_price is None:
+                return None
+            if isinstance(raw_price, (int, float)):
+                return float(raw_price)
+            if isinstance(raw_price, str):
+                m = re.search(r'R\$\s?(\d{1,3}(?:\.\d{3})*(?:,\d{2})?)', raw_price)
+                if m:
+                    try:
+                        return float(m.group(1).replace('.', '').replace(',', '.'))
+                    except ValueError:
+                        pass
+                m2 = re.search(r'(\d+[\.,]\d{2})', raw_price)
+                if m2:
+                    try:
+                        return float(m2.group(1).replace(',', '.'))
+                    except ValueError:
+                        pass
+            return None
+
+        def format_currency_brl(val: Optional[float]) -> str:
+            if val is not None and val > 0:
+                return f"R$ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            return ""
+
+        # 1. Google Shopping via Serper (Catálogo de Preços e Produtos no Brasil)
+        if serper_key:
+            try:
+                shop_resp = requests.post(
+                    "https://google.serper.dev/shopping",
+                    json={"q": query_clean, "gl": "br", "hl": "pt-br", "num": 8},
+                    headers={"X-API-KEY": serper_key, "Content-Type": "application/json"},
+                    timeout=8
+                )
+                if shop_resp.status_code == 200:
+                    shop_data = shop_resp.json()
+                    for s in shop_data.get('shopping', []):
+                        title = s.get('title', '').strip()
+                        price_num = clean_price_val(s.get('price'))
+                        source = s.get('source', '').strip() or 'Google Shopping'
+                        link = s.get('link', '')
+                        img_url = s.get('imageUrl', '')
+
+                        if not title:
+                            continue
+
+                        if price_num and price_num > 5:
+                            if 'usado' in title.lower() or 'usado' in source.lower() or 'olx' in source.lower():
+                                found_prices_used.append(price_num)
+                            else:
+                                found_prices_new.append(price_num)
+
+                        if link and link.startswith('http') and link not in reference_urls:
+                            reference_urls.append(link)
+
+                        items.append({
+                            "title": title,
+                            "price": price_num,
+                            "price_formatted": format_currency_brl(price_num) if price_num else (s.get('price') or ''),
+                            "source": source,
+                            "url": link,
+                            "thumbnail": img_url,
+                            "snippet": s.get('delivery', '') or f"Disponível em {source}"
+                        })
+            except Exception as e:
+                logger.warning(f"Erro na busca shopping Serper: {e}")
+
+            # Busca Orgânica Google Serper complementar
+            try:
+                search_resp = requests.post(
+                    "https://google.serper.dev/search",
+                    json={"q": f"{query_clean} preço ficha técnica mercado livre amazon", "gl": "br", "hl": "pt-br", "num": 6},
+                    headers={"X-API-KEY": serper_key, "Content-Type": "application/json"},
+                    timeout=8
+                )
+                if search_resp.status_code == 200:
+                    search_data = search_resp.json()
+                    for org in search_data.get('organic', []):
+                        title = org.get('title', '').strip()
+                        link = org.get('link', '')
+                        snippet = org.get('snippet', '').strip()
+
+                        if snippet:
+                            all_snippets.append(snippet)
+                            extracted = cls._extract_prices_from_text(snippet)
+                            if extracted.get('preco_novo'):
+                                found_prices_new.append(extracted['preco_novo'])
+                            if extracted.get('preco_usado'):
+                                found_prices_used.append(extracted['preco_usado'])
+
+                        # Identifica fonte a partir do domínio
+                        source_label = "Web / Loja"
+                        link_lower = link.lower()
+                        if "mercadolivre.com" in link_lower:
+                            source_label = "Mercado Livre"
+                        elif "amazon.com" in link_lower:
+                            source_label = "Amazon Brasil"
+                        elif "kabum.com" in link_lower:
+                            source_label = "KaBuM!"
+                        elif "magazineluiza.com" in link_lower or "magalu" in link_lower:
+                            source_label = "Magalu"
+                        elif "shopee.com" in link_lower:
+                            source_label = "Shopee"
+                        elif "olx.com" in link_lower:
+                            source_label = "OLX"
+
+                        if link and link.startswith('http') and link not in reference_urls:
+                            reference_urls.append(link)
+
+                        # Adiciona como item se ainda tivermos poucos itens
+                        if len(items) < 8 and title and link:
+                            ext_p = cls._extract_prices_from_text(snippet)
+                            p_val = ext_p.get('preco_novo') or ext_p.get('preco_usado')
+                            items.append({
+                                "title": title,
+                                "price": p_val,
+                                "price_formatted": format_currency_brl(p_val),
+                                "source": source_label,
+                                "url": link,
+                                "thumbnail": "",
+                                "snippet": snippet[:150]
+                            })
+            except Exception as e:
+                logger.warning(f"Erro na busca orgânica Serper: {e}")
+
+        # 2. Tavily API como complemento/fallback se Serper não retornou itens
+        if len(items) == 0 and tavily_key:
+            try:
+                tav_data = cls._call_tavily(query_clean, tavily_key)
+                if tav_data.get('preco_novo_estimado'):
+                    found_prices_new.append(tav_data['preco_novo_estimado'])
+                if tav_data.get('preco_usado_medio'):
+                    found_prices_used.append(tav_data['preco_usado_medio'])
+                for u in tav_data.get('urls_referencia', []):
+                    if u not in reference_urls:
+                        reference_urls.append(u)
+            except Exception as e:
+                logger.warning(f"Erro no fallback Tavily para busca de título: {e}")
+
+        # 3. Fallback de links diretos se nenhum resultado online foi retornado
+        if not reference_urls:
+            encoded = urllib.parse.quote_plus(query_clean)
+            ml_slug = urllib.parse.quote(query_clean.replace(' ', '-'))
+            reference_urls = [
+                f"https://lista.mercadolivre.com.br/{ml_slug}",
+                f"https://www.amazon.com.br/s?k={encoded}",
+                f"https://www.google.com/search?q={encoded}+preco+brasil"
+            ]
+
+        # 4. Cálculo e Consolidação da Sugestão Inteligente
+        preco_novo_final: Optional[float] = None
+        preco_usado_final: Optional[float] = None
+
+        if found_prices_new:
+            found_prices_new.sort()
+            preco_novo_final = round(found_prices_new[len(found_prices_new)//2], 2)
+
+        if found_prices_used:
+            found_prices_used.sort()
+            preco_usado_final = round(found_prices_used[len(found_prices_used)//2], 2)
+        elif preco_novo_final:
+            preco_usado_final = round(preco_novo_final * 0.60, 2)
+
+        # Escolhe o melhor título limpo e padronizado
+        suggested_title = query_clean
+        if items and items[0].get('title'):
+            first_title = items[0]['title']
+            cleaned = re.sub(r'(?i)\b(frete gr[aá]tis|original|oferta|promo[cç][aã]o|envio r[aá]pido|pronta entrega|novo)\b', '', first_title)
+            cleaned = re.sub(r'[\-\|\–]\s*$', '', cleaned).strip()
+            if len(cleaned) >= 5 and len(cleaned) <= 80:
+                suggested_title = cleaned
+
+        categoria_slug = str(cls.infer_category(f"{query_clean} {suggested_title} {' '.join(all_snippets)}"))
+        categoria_choices_dict = dict(Item.Categoria.choices)
+        categoria_display = categoria_choices_dict.get(categoria_slug, "Outros")
+
+        clean_ranked_urls = cls._filter_and_rank_urls(reference_urls, query_clean)[:4]
+
+        suggestion = {
+            "titulo": suggested_title,
+            "preco_novo": preco_novo_final,
+            "preco_novo_formatado": format_currency_brl(preco_novo_final),
+            "preco_usado": preco_usado_final,
+            "preco_usado_formatado": format_currency_brl(preco_usado_final),
+            "categoria": categoria_slug,
+            "categoria_display": str(categoria_display),
+            "urls": clean_ranked_urls
+        }
+
+        return {
+            "success": True,
+            "query": query_clean,
+            "total": len(items),
+            "items": items[:6],
+            "suggestion": suggestion
+        }
+
+    @classmethod
     def _fallback_market_data(cls, produto_query: str, visual_urls: Optional[List[str]] = None) -> Dict[str, Any]:
         if visual_urls:
             urls = visual_urls[:5]

@@ -59,12 +59,15 @@ class ItemAdmin(admin.ModelAdmin):
             'all': (
                 'css/admin_subtle_actions.css',
                 'css/admin_ai_terminal.css',
+                'css/admin_title_search.css',
             )
         }
         js = (
             'js/admin_ai_terminal.js',
             'js/admin_subtle_actions.js',
+            'js/admin_title_search.js',
         )
+
 
 
     fieldsets = (
