@@ -67,20 +67,20 @@ class VisionService:
 
         # Adiciona até 4 imagens em base64
         for img_obj in imagens[:4]:
-            if os.path.exists(img_obj.imagem.path):
+            if hasattr(img_obj, 'imagem') and img_obj.imagem and os.path.exists(img_obj.imagem.path):
                 with open(img_obj.imagem.path, "rb") as f:
                     b64_data = base64.b64encode(f.read()).decode('utf-8')
                     mime_type = "image/jpeg" if img_obj.imagem.path.lower().endswith(('.jpg', '.jpeg')) else "image/png"
                     parts.append({
-                        "inline_data": {
-                            "mime_type": mime_type,
+                        "inlineData": {
+                            "mimeType": mime_type,
                             "data": b64_data
                         }
                     })
 
         payload = {
             "contents": [{"parts": parts}],
-            "generationConfig": {"response_mime_type": "application/json"}
+            "generationConfig": {"responseMimeType": "application/json"}
         }
 
         last_error = None
@@ -178,9 +178,8 @@ class MarketSearchService:
         url = "https://api.tavily.com/search"
         payload = {
             "api_key": api_key,
-            "query": f"{query} preço novo mercado livre amazon brasil ou usado olx",
+            "query": f"{query} preco mercado livre amazon brasil",
             "search_depth": "basic",
-            "include_domains": ["mercadolivre.com.br", "amazon.com.br", "olx.com.br", "enjoei.com.br", "zoom.com.br"],
             "max_results": 5
         }
         resp = requests.post(url, json=payload, timeout=20)
@@ -350,7 +349,7 @@ class CopywritingService:
         )
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"response_mime_type": "application/json"}
+            "generationConfig": {"responseMimeType": "application/json"}
         }
 
         last_error = None
