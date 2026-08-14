@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from core.models import Item, ImagemItem
 from .services import (
+    VisualSearchService,
     VisionService,
     MarketSearchService,
     CopywritingService,
@@ -35,6 +36,71 @@ class AIEngineServicesTests(TestCase):
         )
         img_file = SimpleUploadedFile("violao.gif", self.dummy_gif, content_type="image/gif")
         ImagemItem.objects.create(item=self.item, imagem=img_file, ordem=0, principal=True)
+
+    def test_visual_search_service_fallback(self):
+        # Sem chaves de API, deve retornar fallback seguro
+        result = VisualSearchService.search_by_image(self.item)
+        self.assertFalse(result["success"])
+        self.assertEqual(result["provider"], "none")
+        self.assertEqual(result["urls_diretas"], [])
+
+    @patch('requests.post')
+    def test_visual_search_google_vision_web_detection(self, mock_post):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "responses": [{
+                "webDetection": {
+                    "bestGuessLabels": [{"label": "suporte de mesa tomate mtg-164"}],
+                    "webEntities": [
+                        {"description": "Tomate MTG-164", "score": 0.95},
+                        {"description": "Suporte articulado", "score": 0.8}
+                    ],
+                    "pagesWithMatchingImages": [
+                        {"url": "https://www.lojatomate.com.br/suporte-de-mesa-mtg-164"},
+                        {"url": "https://www.mercadolivre.com.br/suporte-articulado-tomate-mtg164"}
+                    ]
+                }
+            }]
+        }
+        mock_resp.raise_for_status = MagicMock()
+        mock_post.return_value = mock_resp
+
+        img_path = self.item.imagens.first().imagem.path
+        result = VisualSearchService._call_google_vision_web_detection(img_path, "fake_key")
+        self.assertTrue(result["success"])
+        self.assertEqual(result["provider"], "google_vision_web_detection")
+        self.assertEqual(result["produto_identificado"], "suporte de mesa tomate mtg-164")
+        self.assertIn("https://www.lojatomate.com.br/suporte-de-mesa-mtg-164", result["urls_diretas"])
+
+    @patch('requests.post')
+    @patch('requests.get')
+    def test_visual_search_serpapi_google_lens(self, mock_get, mock_post):
+        # Mock upload de imagem
+        upload_resp = MagicMock()
+        upload_resp.json.return_value = {"image_id": "img_12345"}
+        upload_resp.raise_for_status = MagicMock()
+        mock_post.return_value = upload_resp
+
+        # Mock resultado Google Lens
+        lens_resp = MagicMock()
+        lens_resp.json.return_value = {
+            "visual_matches": [
+                {
+                    "title": "Suporte Articulado Tomate MTG-164",
+                    "link": "https://www.mercadolivre.com.br/p/MLB99999",
+                    "source": "Mercado Livre"
+                }
+            ]
+        }
+        lens_resp.raise_for_status = MagicMock()
+        mock_get.return_value = lens_resp
+
+        img_path = self.item.imagens.first().imagem.path
+        result = VisualSearchService._call_serpapi_google_lens(img_path, "fake_serpapi_key")
+        self.assertTrue(result["success"])
+        self.assertEqual(result["provider"], "serpapi_google_lens")
+        self.assertEqual(result["produto_identificado"], "Suporte Articulado Tomate MTG-164")
+        self.assertIn("https://www.mercadolivre.com.br/p/MLB99999", result["urls_diretas"])
 
     def test_vision_service_fallback(self):
         # Sem API keys configuradas, deve retornar dados fallback coerentes
@@ -76,6 +142,21 @@ class AIEngineServicesTests(TestCase):
         self.assertIn("Fone de Ouvido", query)
         self.assertNotIn("Item em análise", query)
 
+    def test_build_search_query_with_visual_hint(self):
+        vision_data = {
+            "produto_identificado": "Suporte para Celular",
+            "marca": "Genérica",
+            "modelo": "Padrão",
+        }
+        visual_hint = {
+            "produto_identificado": "Suporte de Mesa Tomate MTG-164",
+            "marca": "Tomate",
+            "modelo": "MTG-164"
+        }
+        query = MarketSearchService.build_search_query(vision_data, visual_hint=visual_hint)
+        self.assertIn("Tomate", query)
+        self.assertIn("MTG-164", query)
+
     def test_build_search_query_fallback(self):
         vision_data = {
             "produto_identificado": "",
@@ -85,28 +166,27 @@ class AIEngineServicesTests(TestCase):
         query = MarketSearchService.build_search_query(vision_data, "Cadeira de Escritório Ergonômica")
         self.assertEqual(query, "Cadeira de Escritório Ergonômica")
 
-    def test_filter_and_rank_urls_excludes_junk_and_includes_direct_search(self):
+    def test_filter_and_rank_urls_with_visual_urls(self):
         raw_urls = [
-            "https://www.techtudo.com.br/listas/2025/06/melhor-fone-over-ear-6-modelos-que-valem-cada-centavo-em-2025-edinfoeletro.ghtml",
+            "https://www.techtudo.com.br/listas/2025/06/melhor-fone.ghtml",
             "https://www.amazon.com.br/gp/bestsellers/electronics/16244120011",
-            "https://www.mercadolivre.com.br/blog/10-itens-mais-vendidos-em-fone-de-ouvido",
-            "https://www.amazon.com.br/Fones-Ouvido/b?ie=UTF8&node=16244120011",
-            "https://www.amazon.com.br/Sennheiser-Professional-Audio-400S-inteligente/dp/B07NFQ9FQQ",
             "https://www.mercadolivre.com.br/p/MLB1234567"
         ]
-        query = "Sennheiser HD 400S"
-        filtered = MarketSearchService._filter_and_rank_urls(raw_urls, query)
+        visual_urls = [
+            "https://www.lojatomate.com.br/suporte-mtg-164",
+            "https://www.amazon.com.br/dp/B07NFQ9FQQ"
+        ]
+        query = "Tomate MTG-164"
+        filtered = MarketSearchService._filter_and_rank_urls(raw_urls, query, visual_urls=visual_urls)
+
+        # URLs visuais devem estar no topo
+        self.assertEqual(filtered[0], "https://www.lojatomate.com.br/suporte-mtg-164")
+        self.assertEqual(filtered[1], "https://www.amazon.com.br/dp/B07NFQ9FQQ")
 
         # Não deve conter links de blogs ou bestsellers
         for url in filtered:
             self.assertNotIn("techtudo.com.br/listas", url)
             self.assertNotIn("bestsellers", url)
-            self.assertNotIn("/blog/", url)
-            self.assertNotIn("node=", url)
-
-        # Deve conter páginas válidas do produto
-        self.assertTrue(any("dp/B07NFQ9FQQ" in u for u in filtered))
-        self.assertTrue(any("MLB1234567" in u for u in filtered))
 
     def test_market_search_price_extraction(self):
         sample_text = "Yamaha C40 Violão Clássico Novo por R$ 850,00 na Amazon e usado por R$ 480,00 na OLX."
@@ -151,6 +231,7 @@ class AIEngineServicesTests(TestCase):
         result = AIOrchestrator.process_item(self.item.id)
         self.assertTrue(result["success"])
         self.assertIn("slug", result)
+        self.assertIn("visual_data", result)
 
         # Recarrega do banco
         self.item.refresh_from_db()

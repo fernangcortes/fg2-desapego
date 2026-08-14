@@ -13,13 +13,280 @@ from core.models import Item, ImagemItem
 logger = logging.getLogger(__name__)
 
 
+class VisualSearchService:
+    """
+    Serviço de Busca Visual Reversa (Estilo Google Lens / Google Cloud Vision / SerpApi).
+    Analisa fotos reais para encontrar correspondências visuais exatas no catálogo da web,
+    identificando códigos de modelo específicos (ex: 'Tomate MTG-164'), marcas reais e links diretos.
+    """
+    @classmethod
+    def search_by_image(cls, item: Item) -> Dict[str, Any]:
+        api_config = getattr(settings, 'AI_CONFIG', {})
+        google_vision_key = api_config.get('GOOGLE_VISION_API_KEY')
+        gemini_key = api_config.get('GEMINI_API_KEY')
+        serpapi_key = api_config.get('SERPAPI_API_KEY')
+
+        # Coleta imagens locais válidas do item
+        imagens = [img for img in item.imagens.all() if hasattr(img, 'imagem') and img.imagem and os.path.exists(img.imagem.path)]
+        if not imagens:
+            return {
+                "success": False,
+                "provider": "none",
+                "produto_identificado": "",
+                "marca": "",
+                "modelo": "",
+                "entidades": [],
+                "urls_diretas": []
+            }
+
+        # 1. Google Cloud Vision WEB_DETECTION (Nativo Google, 1.000 req/mês grátis, aceita Base64 local)
+        if google_vision_key:
+            try:
+                res = cls._call_google_vision_web_detection(imagens[0].imagem.path, google_vision_key)
+                if res.get('success'):
+                    return res
+            except Exception as e:
+                logger.error(f"Erro no Google Cloud Vision Web Detection: {e}")
+
+        # 2. Gemini 3.7 Flash com Grounding Multimodal (Google Search Tool)
+        if gemini_key:
+            try:
+                res = cls._call_gemini_grounded_vision(imagens, gemini_key, item)
+                if res.get('success'):
+                    return res
+            except Exception as e:
+                logger.error(f"Erro no Gemini Grounded Vision: {e}")
+
+        # 3. SerpApi Google Lens Engine (API dedicada do Google Lens)
+        if serpapi_key:
+            try:
+                res = cls._call_serpapi_google_lens(imagens[0].imagem.path, serpapi_key)
+                if res.get('success'):
+                    return res
+            except Exception as e:
+                logger.error(f"Erro no SerpApi Google Lens: {e}")
+
+        return {
+            "success": False,
+            "provider": "none",
+            "produto_identificado": "",
+            "marca": "",
+            "modelo": "",
+            "entidades": [],
+            "urls_diretas": []
+        }
+
+    @classmethod
+    def _call_google_vision_web_detection(cls, image_path: str, api_key: str) -> Dict[str, Any]:
+        """
+        Envia a imagem em Base64 para a Google Cloud Vision API com WEB_DETECTION.
+        Retorna rótulos de melhor estimativa (bestGuessLabels), entidades e páginas com imagens correspondentes.
+        """
+        with open(image_path, "rb") as f:
+            b64_img = base64.b64encode(f.read()).decode("utf-8")
+
+        url = f"https://vision.googleapis.com/v1/images:annotate?key={api_key}"
+        payload = {
+            "requests": [
+                {
+                    "image": {"content": b64_img},
+                    "features": [{"type": "WEB_DETECTION", "maxResults": 10}]
+                }
+            ]
+        }
+        resp = requests.post(url, json=payload, timeout=20)
+        resp.raise_for_status()
+        data = resp.json()
+
+        responses = data.get("responses", [])
+        if not responses:
+            return {"success": False, "provider": "google_vision"}
+
+        web_detection = responses[0].get("webDetection", {})
+
+        # Rótulo de melhor estimativa do Google
+        best_guess = ""
+        best_guess_labels = web_detection.get("bestGuessLabels", [])
+        if best_guess_labels:
+            best_guess = best_guess_labels[0].get("label", "").strip()
+
+        # Entidades da web identificadas
+        entities = [
+            e.get("description", "").strip()
+            for e in web_detection.get("webEntities", [])
+            if e.get("description")
+        ]
+
+        # URLs diretas de páginas que contêm a foto ou imagem idêntica
+        matching_pages = web_detection.get("pagesWithMatchingImages", [])
+        direct_urls = []
+        for p in matching_pages:
+            u = p.get("url")
+            if u and u.startswith("http") and u not in direct_urls:
+                direct_urls.append(u)
+
+        # Extração de marca e modelo prováveis a partir do best_guess e entidades
+        marca = ""
+        modelo = ""
+        if best_guess:
+            words = best_guess.split()
+            if len(words) > 1:
+                marca = words[0].capitalize()
+                modelo = " ".join(words[1:])
+            else:
+                modelo = best_guess
+
+        return {
+            "success": bool(best_guess or direct_urls or entities),
+            "provider": "google_vision_web_detection",
+            "produto_identificado": best_guess or (entities[0] if entities else ""),
+            "marca": marca,
+            "modelo": modelo,
+            "entidades": entities[:8],
+            "urls_diretas": direct_urls[:6]
+        }
+
+    @classmethod
+    def _call_gemini_grounded_vision(cls, imagens, api_key: str, item: Item) -> Dict[str, Any]:
+        """
+        Usa o Gemini 3.7 Flash com Grounding do Google Search para cruzar imagens com a web.
+        """
+        candidate_models = ["gemini-3.7-flash", "gemini-3.5-flash", "gemini-flash-latest"]
+        parts = []
+        prompt = (
+            "Você é um especialista em busca reversa visual (estilo Google Lens).\n"
+            "Analise estas fotos e use a ferramenta de busca do Google para encontrar o produto e modelo comercial EXATO no mercado brasileiro.\n"
+            "Identifique:\n"
+            "1. Nome completo e comercial do produto\n"
+            "2. Marca real do fabricante\n"
+            "3. Modelo exato (incluindo códigos como MTG-164, HD 400S, C40, etc.)\n"
+            "4. Categoria mais adequada\n"
+            "5. Links de referência de lojas ou marketplaces brasileiros onde este produto é vendido.\n\n"
+            "Responda estritamente em formato JSON com as chaves:\n"
+            "{\n"
+            '  "produto_identificado": "string",\n'
+            '  "marca": "string",\n'
+            '  "modelo": "string",\n'
+            '  "categoria_sugerida": "string",\n'
+            '  "urls_referencia": ["url1", "url2"]\n'
+            "}"
+        )
+        parts.append({"text": prompt})
+
+        for img_obj in imagens[:3]:
+            if hasattr(img_obj, 'imagem') and img_obj.imagem and os.path.exists(img_obj.imagem.path):
+                with open(img_obj.imagem.path, "rb") as f:
+                    b64_data = base64.b64encode(f.read()).decode('utf-8')
+                    mime_type = "image/jpeg" if img_obj.imagem.path.lower().endswith(('.jpg', '.jpeg')) else "image/png"
+                    parts.append({
+                        "inlineData": {
+                            "mimeType": mime_type,
+                            "data": b64_data
+                        }
+                    })
+
+        payload = {
+            "contents": [{"parts": parts}],
+            "tools": [{"google_search": {}}],
+            "generationConfig": {"responseMimeType": "application/json"}
+        }
+
+        last_error = None
+        for model in candidate_models:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+            try:
+                resp = requests.post(url, json=payload, timeout=30)
+                resp.raise_for_status()
+                data = resp.json()
+                candidate = data.get('candidates', [{}])[0]
+                text = candidate.get('content', {}).get('parts', [{}])[0].get('text', '{}')
+                parsed = json.loads(text)
+
+                grounding_metadata = candidate.get('groundingMetadata', {})
+                grounding_chunks = grounding_metadata.get('groundingChunks', [])
+                grounding_urls = [
+                    ch.get('web', {}).get('uri')
+                    for ch in grounding_chunks
+                    if ch.get('web', {}).get('uri')
+                ]
+
+                urls = parsed.get('urls_referencia', [])
+                for gu in grounding_urls:
+                    if gu not in urls:
+                        urls.append(gu)
+
+                return {
+                    "success": True,
+                    "provider": "gemini_grounded_vision",
+                    "produto_identificado": parsed.get('produto_identificado', ''),
+                    "marca": parsed.get('marca', ''),
+                    "modelo": parsed.get('modelo', ''),
+                    "entidades": [parsed.get('marca', ''), parsed.get('modelo', '')],
+                    "urls_diretas": urls[:6],
+                    "categoria_sugerida": parsed.get('categoria_sugerida', '')
+                }
+            except Exception as e:
+                last_error = e
+                continue
+
+        if last_error:
+            raise last_error
+        return {"success": False, "provider": "gemini_grounded_vision"}
+
+    @classmethod
+    def _call_serpapi_google_lens(cls, image_path: str, api_key: str) -> Dict[str, Any]:
+        """
+        Executa a pesquisa visual na SerpApi usando a engine oficial 'google_lens'.
+        """
+        # Upload da imagem local para a SerpApi
+        upload_url = "https://serpapi.com/image"
+        with open(image_path, "rb") as f:
+            upload_resp = requests.post(upload_url, files={"file": f}, data={"api_key": api_key}, timeout=20)
+            upload_resp.raise_for_status()
+            upload_data = upload_resp.json()
+            image_id = upload_data.get("image_id") or upload_data.get("url")
+
+        if not image_id:
+            return {"success": False, "provider": "serpapi_lens"}
+
+        search_url = "https://serpapi.com/search.json"
+        params = {
+            "api_key": api_key,
+            "engine": "google_lens",
+            "image_id": image_id,
+            "hl": "pt-br",
+            "gl": "br"
+        }
+        resp = requests.get(search_url, params=params, timeout=25)
+        resp.raise_for_status()
+        res_data = resp.json()
+
+        visual_matches = res_data.get("visual_matches", [])
+        urls = []
+        titles = []
+        for vm in visual_matches:
+            if vm.get("link"):
+                urls.append(vm.get("link"))
+            if vm.get("title") and vm.get("title") not in titles:
+                titles.append(vm.get("title"))
+
+        best_title = titles[0] if titles else ""
+        return {
+            "success": bool(urls or best_title),
+            "provider": "serpapi_google_lens",
+            "produto_identificado": best_title,
+            "entidades": titles[:5],
+            "urls_diretas": urls[:6]
+        }
+
+
 class VisionService:
     """
-    Serviço de Visão Computacional (Google Gemini Flash ou Groq Llama 3.2 Vision).
+    Serviço de Visão Computacional (Google Gemini 3.7 Flash ou Groq Llama 3.2 Vision).
     Analisa fotos para identificar produto, marca, modelo exato, defeitos visíveis e acessórios.
     """
     @classmethod
-    def analyze_item_images(cls, item: Item) -> Dict[str, Any]:
+    def analyze_item_images(cls, item: Item, visual_hint: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         api_config = getattr(settings, 'AI_CONFIG', {})
         gemini_key = api_config.get('GEMINI_API_KEY')
         groq_key = api_config.get('GROQ_API_KEY')
@@ -27,37 +294,47 @@ class VisionService:
         # Coleta imagens
         imagens = item.imagens.all()
         if not imagens.exists():
-            return cls._fallback_vision_data(item, "Nenhuma foto fornecida.")
+            return cls._fallback_vision_data(item, "Nenhuma foto fornecida.", visual_hint=visual_hint)
 
         # Tenta Gemini primeiro se configurado
         if gemini_key:
             try:
-                return cls._call_gemini_vision(imagens, gemini_key, item)
+                return cls._call_gemini_vision(imagens, gemini_key, item, visual_hint=visual_hint)
             except Exception as e:
                 logger.error(f"Erro no Gemini Vision: {e}")
 
         # Tenta Groq se configurado
         if groq_key:
             try:
-                return cls._call_groq_vision(imagens, groq_key, item)
+                return cls._call_groq_vision(imagens, groq_key, item, visual_hint=visual_hint)
             except Exception as e:
                 logger.error(f"Erro no Groq Vision: {e}")
 
         # Fallback inteligente se nenhuma chave estiver configurada
-        return cls._fallback_vision_data(item)
+        return cls._fallback_vision_data(item, visual_hint=visual_hint)
 
     @classmethod
-    def _call_gemini_vision(cls, imagens, api_key: str, item: Item) -> Dict[str, Any]:
+    def _call_gemini_vision(cls, imagens, api_key: str, item: Item, visual_hint: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         candidate_models = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-flash-latest"]
         parts = []
+
+        hint_text = ""
+        if visual_hint and visual_hint.get("produto_identificado"):
+            hint_text = (
+                f"\n[DICA DE CORRESPONDÊNCIA VISUAL - GOOGLE LENS / WEB DETECTION]:\n"
+                f"Possível produto identificado visualmente na web: '{visual_hint.get('produto_identificado')}'. "
+                f"Marca sugerida: '{visual_hint.get('marca')}', Modelo sugerido: '{visual_hint.get('modelo')}'. "
+                f"Use essas informações como forte referência técnica caso correspondam ao item nas fotos.\n"
+            )
 
         system_instruction = (
             "Você é um perito em avaliação visual e técnica de itens usados para venda e desapego no Brasil. "
             "Analise as fotos com extrema atenção aos detalhes visuais, inscrições de texto, logotipos, modelo e serigrafias no produto.\n"
+            f"{hint_text}"
             "Identifique com precisão:\n"
             "1. Produto identificado completo com tipo e função principal\n"
             "2. Marca exata do fabricante\n"
-            "3. Modelo exato (ex: HD 400S, C40, WH-1000XM4, iPhone 13 128GB, etc.)\n"
+            "3. Modelo exato (ex: HD 400S, C40, MTG-164, WH-1000XM4, iPhone 13 128GB, etc.)\n"
             "4. Categoria mais adequada\n"
             "5. Estado real de conservação\n"
             "6. CRUCIALMENTE: aponte qualquer defeito, arranhão, mancha, oxidação, poeira ou desgaste de almofadas/cabos visível.\n"
@@ -115,13 +392,18 @@ class VisionService:
         raise Exception("Nenhum modelo Gemini retornou resposta válida.")
 
     @classmethod
-    def _call_groq_vision(cls, imagens, api_key: str, item: Item) -> Dict[str, Any]:
+    def _call_groq_vision(cls, imagens, api_key: str, item: Item, visual_hint: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         url = "https://api.groq.com/openai/v1/chat/completions"
         content_parts = []
+
+        hint_text = ""
+        if visual_hint and visual_hint.get("produto_identificado"):
+            hint_text = f" Dica visual web: {visual_hint.get('produto_identificado')}."
+
         content_parts.append({
             "type": "text",
             "text": (
-                "Identifique com precisão o produto nas fotos, marca e modelo exato, liste defeitos visíveis e acessórios. "
+                f"Identifique com precisão o produto nas fotos, marca e modelo exato.{hint_text} Liste defeitos visíveis e acessórios. "
                 "Retorne estritamente um JSON com: produto_identificado, marca, modelo, "
                 "categoria_sugerida, estado_conservacao, defeitos_visiveis, acessorios_visiveis, especificacoes_visiveis."
             )
@@ -148,12 +430,22 @@ class VisionService:
         return json.loads(res_json['choices'][0]['message']['content'])
 
     @classmethod
-    def _fallback_vision_data(cls, item: Item, motivo: str = "") -> Dict[str, Any]:
+    def _fallback_vision_data(cls, item: Item, motivo: str = "", visual_hint: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         nome = item.titulo if not item.titulo.startswith("Item em análise") else "Item Avaliado"
+        marca = "Genérica / Não identificada"
+        modelo = "Padrão"
+
+        if visual_hint and visual_hint.get("produto_identificado"):
+            nome = visual_hint.get("produto_identificado")
+            if visual_hint.get("marca"):
+                marca = visual_hint.get("marca")
+            if visual_hint.get("modelo"):
+                modelo = visual_hint.get("modelo")
+
         return {
             "produto_identificado": nome,
-            "marca": "Genérica / Não identificada",
-            "modelo": "Padrão",
+            "marca": marca,
+            "modelo": modelo,
             "categoria_sugerida": item.categoria or "outros",
             "estado_conservacao": item.estado_conservacao or "bom",
             "defeitos_visiveis": item.defeitos_visiveis or "Leves marcas naturais de manuseio e uso cotidiano.",
@@ -168,7 +460,7 @@ class MarketSearchService:
     Busca o preço médio do produto NOVO e USADO no Brasil, especificações técnicas e links específicos.
     """
     @classmethod
-    def build_search_query(cls, vision_data: Dict[str, Any], fallback_title: str = "") -> str:
+    def build_search_query(cls, vision_data: Dict[str, Any], fallback_title: str = "", visual_hint: Optional[Dict[str, Any]] = None) -> str:
         """
         Gera uma query precisa e otimizada unindo Marca, Modelo e Tipo de Produto,
         evitando termos genéricos ou redundâncias.
@@ -181,6 +473,16 @@ class MarketSearchService:
             'generica', 'genérica', 'generica / nao identificada', 'genérica / não identificada',
             'padrao', 'padrão', 'item avaliado', 'item em análise', 'outros', 'desconhecido', 'desconhecida'
         }
+
+        # Se tiver dica visual de modelo exato (ex: Tomate MTG-164), usa para enriquecer
+        if visual_hint and visual_hint.get("produto_identificado"):
+            vh_prod = visual_hint.get("produto_identificado")
+            if vh_prod.lower() not in generic_placeholders and len(vh_prod) > len(produto):
+                produto = vh_prod
+            if visual_hint.get("marca") and visual_hint.get("marca").lower() not in generic_placeholders:
+                marca = visual_hint.get("marca")
+            if visual_hint.get("modelo") and visual_hint.get("modelo").lower() not in generic_placeholders:
+                modelo = visual_hint.get("modelo")
 
         marca_clean = "" if marca.lower() in generic_placeholders else marca
         modelo_clean = "" if modelo.lower() in generic_placeholders else modelo
@@ -213,28 +515,28 @@ class MarketSearchService:
         return query
 
     @classmethod
-    def search_market_prices(cls, produto_query: str) -> Dict[str, Any]:
+    def search_market_prices(cls, produto_query: str, visual_urls: Optional[List[str]] = None) -> Dict[str, Any]:
         api_config = getattr(settings, 'AI_CONFIG', {})
         tavily_key = api_config.get('TAVILY_API_KEY')
         serper_key = api_config.get('SERPER_API_KEY')
 
         if tavily_key:
             try:
-                return cls._call_tavily(produto_query, tavily_key)
+                return cls._call_tavily(produto_query, tavily_key, visual_urls=visual_urls)
             except Exception as e:
                 logger.error(f"Erro na API Tavily: {e}")
 
         if serper_key:
             try:
-                return cls._call_serper(produto_query, serper_key)
+                return cls._call_serper(produto_query, serper_key, visual_urls=visual_urls)
             except Exception as e:
                 logger.error(f"Erro na API Serper: {e}")
 
         # Fallback de busca de mercado
-        return cls._fallback_market_data(produto_query)
+        return cls._fallback_market_data(produto_query, visual_urls=visual_urls)
 
     @classmethod
-    def _call_tavily(cls, query: str, api_key: str) -> Dict[str, Any]:
+    def _call_tavily(cls, query: str, api_key: str, visual_urls: Optional[List[str]] = None) -> Dict[str, Any]:
         url = "https://api.tavily.com/search"
         payload = {
             "api_key": api_key,
@@ -251,7 +553,7 @@ class MarketSearchService:
         all_snippets = " ".join(snippets_list)
 
         precos = cls._extract_prices_from_text(all_snippets)
-        filtered_urls = cls._filter_and_rank_urls(raw_urls, query)
+        filtered_urls = cls._filter_and_rank_urls(raw_urls, query, visual_urls=visual_urls)
 
         return {
             "preco_novo_estimado": precos.get('preco_novo'),
@@ -261,7 +563,7 @@ class MarketSearchService:
         }
 
     @classmethod
-    def _call_serper(cls, query: str, api_key: str) -> Dict[str, Any]:
+    def _call_serper(cls, query: str, api_key: str, visual_urls: Optional[List[str]] = None) -> Dict[str, Any]:
         url = "https://google.serper.dev/search"
         payload = {
             "q": f"{query} preço especificações mercado livre amazon brasil",
@@ -279,7 +581,7 @@ class MarketSearchService:
         all_snippets = " ".join(snippets_list)
 
         precos = cls._extract_prices_from_text(all_snippets)
-        filtered_urls = cls._filter_and_rank_urls(raw_urls, query)
+        filtered_urls = cls._filter_and_rank_urls(raw_urls, query, visual_urls=visual_urls)
 
         return {
             "preco_novo_estimado": precos.get('preco_novo'),
@@ -289,12 +591,12 @@ class MarketSearchService:
         }
 
     @classmethod
-    def _filter_and_rank_urls(cls, raw_urls: List[str], query: str) -> List[str]:
+    def _filter_and_rank_urls(cls, raw_urls: List[str], query: str, visual_urls: Optional[List[str]] = None) -> List[str]:
         """
-        Filtra URLs genéricas, de blog, listas de mais vendidos e nós vazios,
-        priorizando páginas de produto diretas e adicionando links de busca específicos do produto.
+        Filtra URLs genéricas, de blog, listas de mais vendidos e nós vazios.
+        Prioriza páginas diretas de produto obtidas por Busca Visual Reversa (Google Lens / Vision).
+        Evita links de busca genéricos (/s?k=...) quando houver links de produtos reais catalogados.
         """
-        # Padrões indesejados (blogs, listas de mais vendidos, nós de categoria genéricos)
         junk_patterns = [
             r'/blog/',
             r'/artigos/',
@@ -318,15 +620,22 @@ class MarketSearchService:
         valid_urls: List[str] = []
         foreign_urls: List[str] = []
 
+        # 1. Prioridade Máxima: URLs diretas vindas da Busca Visual Reversa
+        if visual_urls:
+            for vu in visual_urls:
+                if not vu or not vu.startswith('http'):
+                    continue
+                if any(re.search(pat, vu, re.IGNORECASE) for pat in junk_patterns):
+                    continue
+                if vu not in valid_urls:
+                    valid_urls.append(vu)
+
+        # 2. URLs orgânicas da busca de mercado
         for u in raw_urls:
             if not u or not u.startswith('http'):
                 continue
-
-            # Checa se bate com algum padrão de conteúdo genérico/blog
             if any(re.search(pat, u, re.IGNORECASE) for pat in junk_patterns):
                 continue
-
-            # Se for amazon internacional (.com, .de) e não amazon.com.br, guarda separado
             if 'amazon.com/' in u or 'amazon.de/' in u or 'amazon.co.uk/' in u:
                 foreign_urls.append(u)
             else:
@@ -338,16 +647,15 @@ class MarketSearchService:
             if len(valid_urls) < 3 and fu not in valid_urls:
                 valid_urls.append(fu)
 
-        # Garante links diretos de busca no Mercado Livre e Amazon BR com o termo exato
-        encoded_query = urllib.parse.quote_plus(query)
-        ml_search_url = f"https://lista.mercadolivre.com.br/{urllib.parse.quote(query.replace(' ', '-'))}"
-        amz_search_url = f"https://www.amazon.com.br/s?k={encoded_query}"
-
-        # Se houver menos de 2 páginas diretas de produto, adiciona os links diretos de busca
-        if ml_search_url not in valid_urls and len(valid_urls) < 4:
-            valid_urls.append(ml_search_url)
-        if amz_search_url not in valid_urls and len(valid_urls) < 5:
-            valid_urls.append(amz_search_url)
+        # 3. Só adiciona links diretos de busca no ML/Amazon se tivermos MENOS de 2 páginas de produto
+        if len(valid_urls) < 2 and query:
+            encoded_query = urllib.parse.quote_plus(query)
+            ml_search_url = f"https://lista.mercadolivre.com.br/{urllib.parse.quote(query.replace(' ', '-'))}"
+            amz_search_url = f"https://www.amazon.com.br/s?k={encoded_query}"
+            if ml_search_url not in valid_urls:
+                valid_urls.append(ml_search_url)
+            if amz_search_url not in valid_urls:
+                valid_urls.append(amz_search_url)
 
         return valid_urls[:5]
 
@@ -373,17 +681,21 @@ class MarketSearchService:
         return {"preco_novo": preco_novo, "preco_usado": preco_usado}
 
     @classmethod
-    def _fallback_market_data(cls, produto_query: str) -> Dict[str, Any]:
-        encoded_query = urllib.parse.quote_plus(produto_query)
-        ml_query = urllib.parse.quote(produto_query.replace(' ', '-'))
-        return {
-            "preco_novo_estimado": None,
-            "preco_usado_medio": None,
-            "urls_referencia": [
+    def _fallback_market_data(cls, produto_query: str, visual_urls: Optional[List[str]] = None) -> Dict[str, Any]:
+        if visual_urls:
+            urls = visual_urls[:5]
+        else:
+            encoded_query = urllib.parse.quote_plus(produto_query)
+            ml_query = urllib.parse.quote(produto_query.replace(' ', '-'))
+            urls = [
                 f"https://lista.mercadolivre.com.br/{ml_query}",
                 f"https://www.amazon.com.br/s?k={encoded_query}",
                 f"https://www.google.com/search?q={encoded_query}+preco+brasil"
-            ],
+            ]
+        return {
+            "preco_novo_estimado": None,
+            "preco_usado_medio": None,
+            "urls_referencia": urls,
             "snippets_pesquisa": ""
         }
 
@@ -434,14 +746,14 @@ class CopywritingService:
             "Com base no produto, marca e modelo identificados e nos dados de pesquisa, crie um anúncio de altíssima qualidade técnica.\n\n"
             "ESTRUTURA OBRIGATÓRIA DA DESCRIÇÃO (formate com títulos e tópicos em Markdown):\n"
             "1. 📦 **Visão Geral**: Resumo do produto, marca, modelo e principais destaques e usabilidade.\n"
-            "2. 📋 **Ficha Técnica & Especificações Exatas**: Liste as especificações técnicas oficiais e reais do modelo identificado (ex: para áudio/fones: tipo de driver, resposta de frequência, impedância, conector P2/P10/Bluetooth/USB, microfone integrado, isolamento acústico, peso; para instrumentos: madeiras, captação, trastes; para informática/eletrônicos: processador, memória, tela, conexões; para eletros/ferramentas: voltagem, potência em Watts, dimensões, materiais).\n"
+            "2. 📋 **Ficha Técnica & Especificações Exatas**: Liste as especificações técnicas oficiais e reais do modelo identificado (ex: para áudio/fones: tipo de driver, resposta de frequência, impedância, conector P2/P10/Bluetooth/USB, microfone integrado, isolamento acústico, peso; para instrumentos: madeiras, captação, trastes; para informática/eletrônicos: processador, memória, tela, conexões; para suportes/eletros/ferramentas: dimensões, materiais, capacidade de peso, compatibilidade, voltagem, potência).\n"
             "3. 🔍 **Transparência Total (Estado Real & Detalhes Visíveis)**: Detalhe de forma 100% honesta qualquer marca de uso, arranhão, desgaste ou detalhe apontado pela visão computacional ou pelo vendedor.\n"
             "4. 🎁 **Itens Inclusos**: Liste tudo o que acompanha o produto (cabos, adaptadores, capa, manuais, caixa).\n"
             "5. 🚚 **Condições de Retirada & Envio**: Informações práticas sobre retirada em mãos ou envio seguro.\n\n"
             "Retorne a resposta ESTRITAMENTE em formato JSON com o seguinte schema:\n"
             "{\n"
             '  "titulo": "Título objetivo e atrativo com marca, modelo e atributo principal (max 70 chars)",\n'
-            '  "slug": "Slug amigável, simples, curto e limpo em minúsculas com hífens baseado no produto, marca e modelo (ex: \'fone-sennheiser-hd-400s\', \'camera-sony-a6400\', \'violao-yamaha-c40\')",\n'
+            '  "slug": "Slug amigável, simples, curto e limpo em minúsculas com hífens baseado no produto, marca e modelo (ex: \'fone-sennheiser-hd-400s\', \'suporte-tomate-mtg-164\', \'violao-yamaha-c40\')",\n'
             '  "descricao": "Texto completo da descrição seguindo a estrutura de tópicos acima",\n'
             '  "preco_usado": 0.00,\n'
             '  "preco_novo": 0.00,\n'
@@ -613,7 +925,11 @@ class NotificationService:
 class AIOrchestrator:
     """
     Orquestrador da Chain of Thought de IA:
-    1. Visão Computacional -> 2. Pesquisa de Mercado & Ficha Técnica -> 3. Copywriting Técnico -> 4. Notificação
+    1. Busca Visual Reversa (Google Lens / Google Vision)
+    2. Visão Computacional Enriquecida
+    3. Pesquisa de Mercado & Ficha Técnica
+    4. Copywriting Técnico & Precificação
+    5. Notificação
     """
     @classmethod
     def process_item(cls, item_id: int) -> Dict[str, Any]:
@@ -624,15 +940,32 @@ class AIOrchestrator:
 
         logger.info(f"Iniciando pipeline de IA para o Item ID {item_id}: {item.titulo}")
 
-        # Passo 1: Visão Computacional
-        vision_result = VisionService.analyze_item_images(item)
+        # Passo 1: Busca Visual Reversa (Google Lens / Google Cloud Vision / Gemini Grounding)
+        visual_result = VisualSearchService.search_by_image(item)
+        if visual_result.get("success"):
+            logger.info(f"Busca visual reversa ({visual_result.get('provider')}): '{visual_result.get('produto_identificado')}'")
 
-        # Passo 2: Construção da Query Otimizada e Pesquisa de Mercado
-        search_query = MarketSearchService.build_search_query(vision_result, item.titulo)
+        # Passo 2: Visão Computacional (alimentada com a dica visual identificada)
+        vision_result = VisionService.analyze_item_images(item, visual_hint=visual_result)
+
+        # Se a busca visual identificou marca/modelo específicos e a visão computacional veio genérica, mescla
+        if visual_result.get("success"):
+            if visual_result.get("marca") and (not vision_result.get("marca") or "gen" in vision_result.get("marca", "").lower()):
+                vision_result["marca"] = visual_result["marca"]
+            if visual_result.get("modelo") and (not vision_result.get("modelo") or vision_result.get("modelo", "").lower() in ["padrão", "padrao", "outros"]):
+                vision_result["modelo"] = visual_result["modelo"]
+            if visual_result.get("produto_identificado") and vision_result.get("produto_identificado", "").lower() in ["item avaliado", "item em análise", "produto em desapego", "suporte para celular"]:
+                vision_result["produto_identificado"] = visual_result["produto_identificado"]
+
+        # Passo 3: Construção da Query Otimizada e Pesquisa de Mercado
+        search_query = MarketSearchService.build_search_query(vision_result, item.titulo, visual_hint=visual_result)
         logger.info(f"Query otimizada construída para busca de mercado: '{search_query}'")
-        market_result = MarketSearchService.search_market_prices(search_query)
+        market_result = MarketSearchService.search_market_prices(
+            search_query,
+            visual_urls=visual_result.get("urls_diretas", [])
+        )
 
-        # Passo 3: Copywriting com Ficha Técnica Exata e Transparência Total
+        # Passo 4: Copywriting com Ficha Técnica Exata e Transparência Total
         copy_result = CopywritingService.generate_listing_copy(
             vision_data=vision_result,
             market_data=market_result,
@@ -677,7 +1010,7 @@ class AIOrchestrator:
         # Salva o item
         item.save()
 
-        # Passo 4: Notificação
+        # Passo 5: Notificação
         NotificationService.notify_draft_ready(item)
 
         def format_currency(val):
@@ -703,6 +1036,7 @@ class AIOrchestrator:
             "descricao_ia": item.descricao_ia,
             "urls_referencia": item.urls_referencia or [],
             "num_urls": len(item.urls_referencia) if item.urls_referencia else 0,
+            "visual_data": visual_result,
             "vision_data": vision_result,
             "market_data": {
                 "preco_novo_estimado": market_result.get("preco_novo_estimado"),

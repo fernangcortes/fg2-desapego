@@ -133,9 +133,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Configurações de Integração de Inteligência Artificial & Serviços
 AI_CONFIG = {
+    'GOOGLE_VISION_API_KEY': os.getenv('GOOGLE_VISION_API_KEY', ''),
     'GEMINI_API_KEY': os.getenv('GEMINI_API_KEY', ''),
     'GROQ_API_KEY': os.getenv('GROQ_API_KEY', ''),
     'DEEPSEEK_API_KEY': os.getenv('DEEPSEEK_API_KEY', ''),
+    'SERPAPI_API_KEY': os.getenv('SERPAPI_API_KEY', ''),
     'TAVILY_API_KEY': os.getenv('TAVILY_API_KEY', ''),
     'SERPER_API_KEY': os.getenv('SERPER_API_KEY', ''),
     'TELEGRAM_BOT_TOKEN': os.getenv('TELEGRAM_BOT_TOKEN', ''),

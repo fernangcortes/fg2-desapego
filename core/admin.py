@@ -19,11 +19,16 @@ class ImagemItemInline(admin.TabularInline):
     def thumbnail_preview(self, obj):
         if obj.imagem:
             return format_html(
-                '<img src="{}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 6px; border: 1px solid #ddd;" />',
+                '<div style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">'
+                '<img src="{}" style="width: 75px; height: 75px; object-fit: cover; border-radius: 6px; border: 1px solid #ddd;" />'
+                '<a href="https://lens.google.com/" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 600; color: #0284c7; text-decoration: none; padding: 2px 5px; background: #f0f9ff; border-radius: 4px; border: 1px solid #bae6fd;" title="Abrir Google Lens para busca visual por similaridade">'
+                '🔍 Google Lens'
+                '</a>'
+                '</div>',
                 obj.imagem.url
             )
         return "-"
-    thumbnail_preview.short_description = "Prévia"
+    thumbnail_preview.short_description = "Prévia & Lens"
 
 
 @admin.register(Item)
@@ -185,6 +190,16 @@ class ItemAdmin(admin.ModelAdmin):
                 badge_color = "#9a3412"
                 label = "Amazon Brasil"
                 icon = "🟠"
+            elif "shopee.com" in url_lower:
+                badge_bg = "#fee2e2"
+                badge_color = "#991b1b"
+                label = "Shopee"
+                icon = "🔴"
+            elif "aliexpress.com" in url_lower:
+                badge_bg = "#ffedd5"
+                badge_color = "#c2410c"
+                label = "AliExpress"
+                icon = "🟧"
             elif "kabum.com" in url_lower:
                 badge_bg = "#dbeafe"
                 badge_color = "#1e40af"
@@ -195,15 +210,25 @@ class ItemAdmin(admin.ModelAdmin):
                 badge_color = "#3730a3"
                 label = "Magalu"
                 icon = "🟣"
+            elif "lens.google.com" in url_lower:
+                badge_bg = "#e0f2fe"
+                badge_color = "#0369a1"
+                label = "Google Lens"
+                icon = "🔍"
             elif "google.com" in url_lower:
                 badge_bg = "#f1f5f9"
                 badge_color = "#334155"
                 label = "Google Busca"
                 icon = "🔍"
+            elif "lojatomate.com" in url_lower or "sennheiser.com" in url_lower or "yamaha.com" in url_lower:
+                badge_bg = "#f0fdf4"
+                badge_color = "#166534"
+                label = "Loja Oficial / Fabricante"
+                icon = "🏷️"
             else:
                 badge_bg = "#f0fdf4"
                 badge_color = "#166534"
-                label = "Referência Web / Fabricante"
+                label = "Referência Web / Loja"
                 icon = "🌐"
 
             items_html.append(
