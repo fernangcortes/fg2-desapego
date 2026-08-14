@@ -135,7 +135,14 @@ class HubDesapegoCoreTests(TestCase):
         self.assertTrue(os.path.exists(sw_path), "service-worker.js não encontrado em static/")
         self.assertTrue(os.path.exists(icon_path), "icon-192.png não encontrado em static/icons/")
 
-    def test_upload_rapido_get(self):
+    def test_upload_rapido_requires_staff(self):
+        # Visitante anônimo deve ser redirecionado para o login admin
+        response = self.client.get('/upload/')
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/admin/login/', response.url)
+
+    def test_upload_rapido_get_authenticated(self):
+        self.client.login(username='admin_test', password='password123')
         response = self.client.get('/upload/')
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Upload Rápido de Item")
@@ -143,6 +150,7 @@ class HubDesapegoCoreTests(TestCase):
         self.assertContains(response, "Galeria")
 
     def test_upload_rapido_post_success(self):
+        self.client.login(username='admin_test', password='password123')
         foto1 = SimpleUploadedFile("furadeira1.gif", self.dummy_gif, content_type="image/gif")
         foto2 = SimpleUploadedFile("furadeira2.gif", self.dummy_gif, content_type="image/gif")
 
@@ -169,6 +177,7 @@ class HubDesapegoCoreTests(TestCase):
         self.assertTrue(item.imagens.filter(ordem=1, principal=True).exists())
 
     def test_upload_rapido_post_without_images(self):
+        self.client.login(username='admin_test', password='password123')
         response = self.client.post('/upload/', {
             'titulo_provisorio': 'Item sem foto',
             'imagens': []

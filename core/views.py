@@ -96,9 +96,11 @@ def item_detail(request, slug):
     })
 
 
+@staff_member_required
 def upload_rapido(request):
     """
     Interface mobile-first de upload rápido de fotos de itens usando a câmera nativa.
+    Exclusivo para administradores e equipe do desapego (evita uso indevido de APIs e uploads por visitantes).
     Cria um Item com status 'rascunho' e associa as imagens enviadas.
     """
     if request.method == 'POST':

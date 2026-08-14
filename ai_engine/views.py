@@ -56,10 +56,11 @@ def serpapi_quota_view(request):
     return JsonResponse(quota)
 
 
+@staff_member_required
 def search_internet_products_view(request):
     """
     Pesquisa em tempo real produtos e preços na internet correspondentes ao termo digitado no título.
-    Usado no Django Admin e no formulário de Upload Rápido.
+    Exclusivo para administradores (evita consumo indevido de cotas de APIs por visitantes).
     """
     query = request.GET.get('q', '').strip()
     if not query or len(query) < 2:
@@ -75,10 +76,12 @@ def search_internet_products_view(request):
     return JsonResponse(resultado)
 
 
+@staff_member_required
 def proxy_image_view(request):
     """
     Proxy seguro para carregamento e conversão de fotos externas da web para Blob/File no navegador,
     evitando bloqueios de CORS ao importar imagens do Google Shopping/Mercado Livre no cliente.
+    Exclusivo para administradores.
     """
     url = request.GET.get('url', '').strip()
     if not url or not url.startswith('http'):

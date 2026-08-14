@@ -315,6 +315,13 @@ class AIEngineServicesTests(TestCase):
             self.assertTrue(len(res["suggestion"]["urls"]) > 0)
 
     def test_search_internet_products_view(self):
+        # Sem login deve redirecionar (staff_member_required)
+        resp_unauth = self.client.get('/ai/search-title/?q=Violao')
+        self.assertEqual(resp_unauth.status_code, 302)
+
+        # Logado como staff
+        self.client.login(username='staff_test', password='password123')
+
         # Query vazia
         resp_empty = self.client.get('/ai/search-title/?q=')
         self.assertEqual(resp_empty.status_code, 200)
@@ -335,6 +342,13 @@ class AIEngineServicesTests(TestCase):
 
     @patch('requests.get')
     def test_proxy_image_view(self, mock_get):
+        # Sem login deve redirecionar (staff_member_required)
+        resp_unauth = self.client.get('/ai/proxy-image/?url=https://example.com/foto.gif')
+        self.assertEqual(resp_unauth.status_code, 302)
+
+        # Logado como staff
+        self.client.login(username='staff_test', password='password123')
+
         # Teste URL vazia / inválida
         resp_invalid = self.client.get('/ai/proxy-image/?url=')
         self.assertEqual(resp_invalid.status_code, 400)
