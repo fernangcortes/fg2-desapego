@@ -51,13 +51,13 @@ class ItemAdmin(admin.ModelAdmin):
     class Media:
         css = {
             'all': (
-                'css/admin_subtle_actions.css',
-                'css/admin_ai_terminal.css',
+                'css/admin_subtle_actions.css?v=2.8',
+                'css/admin_ai_terminal.css?v=2.8',
             )
         }
         js = (
-            'js/admin_ai_terminal.js',
-            'js/admin_subtle_actions.js',
+            'js/admin_ai_terminal.js?v=2.8',
+            'js/admin_subtle_actions.js?v=2.8',
         )
 
 

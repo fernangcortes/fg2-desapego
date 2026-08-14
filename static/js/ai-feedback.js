@@ -175,10 +175,29 @@ const AIFeedback = {
             }
         })
         .then(async (response) => {
-            const data = await response.json();
-            if (!response.ok || data.success === false) {
-                throw new Error(data.error || 'Falha ao processar item com IA.');
+            let data = null;
+            const contentType = response.headers.get('content-type') || '';
+
+            if (contentType.includes('application/json')) {
+                try {
+                    data = await response.json();
+                } catch (e) {
+                    data = null;
+                }
             }
+
+            if (!response.ok) {
+                if (response.status === 504) {
+                    throw new Error("O servidor demorou mais que o esperado (Timeout 504). Tente novamente em instantes.");
+                }
+                const errorMsg = (data && data.error) ? data.error : `Erro HTTP ${response.status}: Não foi possível completar a análise.`;
+                throw new Error(errorMsg);
+            }
+
+            if (!data || data.success === false) {
+                throw new Error((data && data.error) || 'Falha ao processar item com IA.');
+            }
+
             return data;
         })
         .then((data) => {
