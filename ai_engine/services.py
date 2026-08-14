@@ -1158,6 +1158,41 @@ class MarketSearchService:
 
         clean_ranked_urls = cls._filter_and_rank_urls(reference_urls, query_clean)[:4]
 
+        # Coleta imagens válidas e únicas encontradas na pesquisa
+        all_image_urls = []
+        for it in items:
+            t_url = it.get('thumbnail')
+            if t_url and t_url.startswith('http') and t_url not in all_image_urls:
+                all_image_urls.append(t_url)
+
+        # Gera descrição estruturada com ficha técnica e transparência
+        desc_lines = [
+            f"📦 **Visão Geral**: {suggested_title}",
+            "Item de excelente qualidade e desempenho comprovado no mercado.",
+            "",
+            "📋 **Ficha Técnica & Destaques**:",
+            f"- **Produto / Modelo**: {suggested_title}",
+            f"- **Categoria**: {categoria_display}",
+        ]
+        if preco_novo_final:
+            desc_lines.append(f"- **Referência Novo no Mercado**: {format_currency_brl(preco_novo_final)}")
+        if preco_usado_final:
+            desc_lines.append(f"- **Preço Sugerido de Desapego**: {format_currency_brl(preco_usado_final)}")
+
+        desc_lines.extend([
+            "",
+            "🔍 **Transparência Total & Estado Real**:",
+            "- Produto em ótimo estado de conservação e funcionamento.",
+            "- Revisado e pronto para uso imediato.",
+            "",
+            "🎁 **Itens Inclusos**:",
+            "- Acompanha o produto conforme fotos e especificações originais.",
+            "",
+            "🚚 **Condições de Retirada & Envio**:",
+            "- Retirada presencial ou envio com embalagem reforçada."
+        ])
+        suggested_description = "\n".join(desc_lines)
+
         suggestion = {
             "titulo": suggested_title,
             "preco_novo": preco_novo_final,
@@ -1166,6 +1201,10 @@ class MarketSearchService:
             "preco_usado_formatado": format_currency_brl(preco_usado_final),
             "categoria": categoria_slug,
             "categoria_display": str(categoria_display),
+            "tipo_anuncio": Item.TipoAnuncio.VENDA,
+            "tipo_anuncio_display": "Venda",
+            "descricao": suggested_description,
+            "images": all_image_urls[:6],
             "urls": clean_ranked_urls
         }
 

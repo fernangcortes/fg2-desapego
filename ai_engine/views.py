@@ -1,9 +1,15 @@
+import json
+import logging
+import requests
 from django.shortcuts import get_object_or_404, redirect
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
-from django.http import JsonResponse
-from core.models import Item
+from django.http import JsonResponse, HttpResponse
+from django.core.files.base import ContentFile
+from core.models import Item, ImagemItem
 from .services import AIOrchestrator, SerpApiService, MarketSearchService
+
+logger = logging.getLogger(__name__)
 
 
 @staff_member_required
@@ -67,4 +73,83 @@ def search_internet_products_view(request):
 
     resultado = MarketSearchService.search_internet_products(query)
     return JsonResponse(resultado)
+
+
+def proxy_image_view(request):
+    """
+    Proxy seguro para carregamento e conversão de fotos externas da web para Blob/File no navegador,
+    evitando bloqueios de CORS ao importar imagens do Google Shopping/Mercado Livre no cliente.
+    """
+    url = request.GET.get('url', '').strip()
+    if not url or not url.startswith('http'):
+        return HttpResponse("URL inválida", status=400)
+
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
+        }
+        r = requests.get(url, headers=headers, timeout=8)
+        if r.status_code == 200:
+            content_type = r.headers.get('Content-Type', 'image/jpeg')
+            resp = HttpResponse(r.content, content_type=content_type)
+            resp['Access-Control-Allow-Origin'] = '*'
+            resp['Cache-Control'] = 'public, max-age=86400'
+            return resp
+    except Exception as e:
+        logger.warning(f"Erro ao obter imagem proxy ({url}): {e}")
+
+    return HttpResponse("Falha ao carregar imagem", status=502)
+
+
+@staff_member_required
+def import_web_images_view(request):
+    """
+    Endpoint para persistir fotos selecionadas da web diretamente no banco de dados para um Item existente.
+    """
+    if request.method != 'POST':
+        return JsonResponse({"error": "Método POST obrigatório"}, status=405)
+
+    try:
+        data = json.loads(request.body.decode('utf-8'))
+        item_id = data.get('item_id')
+        image_urls = data.get('images', [])
+
+        item = get_object_or_404(Item, pk=item_id)
+        imported = 0
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+
+        for idx, img_url in enumerate(image_urls):
+            if not img_url or not img_url.startswith('http'):
+                continue
+            try:
+                r = requests.get(img_url, headers=headers, timeout=8)
+                if r.status_code == 200:
+                    ext = "jpg"
+                    if "png" in r.headers.get('Content-Type', ''):
+                        ext = "png"
+                    elif "webp" in r.headers.get('Content-Type', ''):
+                        ext = "webp"
+
+                    file_name = f"web_{item.slug or item.id}_{idx + 1}.{ext}"
+                    has_cover = item.imagens.filter(principal=True).exists()
+
+                    ImagemItem.objects.create(
+                        item=item,
+                        imagem=ContentFile(r.content, name=file_name),
+                        ordem=item.imagens.count(),
+                        principal=(not has_cover and idx == 0)
+                    )
+                    imported += 1
+            except Exception as err:
+                logger.warning(f"Erro ao importar foto remota {img_url}: {err}")
+
+        return JsonResponse({
+            "success": True,
+            "imported": imported,
+            "total_images": item.imagens.count()
+        })
+    except Exception as e:
+        return JsonResponse({"success": False, "error": str(e)}, status=400)
+
 

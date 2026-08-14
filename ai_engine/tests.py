@@ -1,3 +1,4 @@
+import json
 from unittest.mock import patch, MagicMock
 from django.test import TestCase, Client, override_settings
 from django.contrib.auth import get_user_model
@@ -328,4 +329,61 @@ class AIEngineServicesTests(TestCase):
         self.assertEqual(data["query"], "Violao Yamaha C40")
         self.assertIn("suggestion", data)
         self.assertIn("categoria", data["suggestion"])
+        self.assertIn("images", data["suggestion"])
+        self.assertIn("descricao", data["suggestion"])
+        self.assertIn("tipo_anuncio", data["suggestion"])
+
+    @patch('requests.get')
+    def test_proxy_image_view(self, mock_get):
+        # Teste URL vazia / inválida
+        resp_invalid = self.client.get('/ai/proxy-image/?url=')
+        self.assertEqual(resp_invalid.status_code, 400)
+
+        # Teste download bem-sucedido
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.content = self.dummy_gif
+        mock_resp.headers = {'Content-Type': 'image/gif'}
+        mock_get.return_value = mock_resp
+
+        resp_ok = self.client.get('/ai/proxy-image/?url=https://example.com/foto.gif')
+        self.assertEqual(resp_ok.status_code, 200)
+        self.assertEqual(resp_ok['Content-Type'], 'image/gif')
+        self.assertEqual(resp_ok.content, self.dummy_gif)
+
+    @patch('requests.get')
+    def test_import_web_images_view(self, mock_get):
+        # Sem login deve redirecionar (staff_member_required)
+        resp_unauth = self.client.post(
+            '/ai/import-web-images/',
+            data='{"item_id": 1, "images": []}',
+            content_type='application/json'
+        )
+        self.assertEqual(resp_unauth.status_code, 302)
+
+        # Logado como staff
+        self.client.login(username='staff_test', password='password123')
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.content = self.dummy_gif
+        mock_resp.headers = {'Content-Type': 'image/gif'}
+        mock_get.return_value = mock_resp
+
+        initial_count = self.item.imagens.count()
+
+        resp = self.client.post(
+            '/ai/import-web-images/',
+            data=json.dumps({
+                "item_id": self.item.id,
+                "images": ["https://example.com/foto1.gif", "https://example.com/foto2.gif"]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data.get("success"))
+        self.assertEqual(data.get("imported"), 2)
+        self.assertEqual(self.item.imagens.count(), initial_count + 2)
+
 
