@@ -41,7 +41,13 @@ class VisualSearchService:
                 "urls_diretas": []
             }
 
-        # 1. Google Cloud Vision WEB_DETECTION + OCR + Labels (Nativo Google Cloud)
+        # 1. Google Lens Nativo (chrome-lens-py / Chromium Protobuf Engine - Zero chaves, 100% grátis)
+        lens_native_res = cls._call_chrome_lens_native(imagens[0].imagem.path)
+        if lens_native_res.get('success') and lens_native_res.get('ocr_text'):
+            logger.info(f"Google Lens Nativo detectou OCR: '{lens_native_res.get('ocr_text')}'")
+            return lens_native_res
+
+        # 2. Google Cloud Vision WEB_DETECTION + OCR + Labels (Nativo Google Cloud)
         if google_vision_key:
             try:
                 res = cls._call_google_vision_web_detection(imagens[0].imagem.path, google_vision_key)
@@ -50,7 +56,7 @@ class VisualSearchService:
             except Exception as e:
                 logger.error(f"Erro no Google Cloud Vision Web Detection: {e}")
 
-        # 2. Gemini 3.7 Flash com Grounding Multimodal (Google Search Tool)
+        # 3. Gemini 3.7 Flash com Grounding Multimodal (Google Search Tool)
         if gemini_key:
             try:
                 res = cls._call_gemini_grounded_vision(imagens, gemini_key, item)
@@ -59,7 +65,7 @@ class VisualSearchService:
             except Exception as e:
                 logger.error(f"Erro no Gemini Grounded Vision: {e}")
 
-        # 3. SerpApi Google Lens Engine (API dedicada do Google Lens)
+        # 4. SerpApi Google Lens Engine (API dedicada do Google Lens)
         if serpapi_key:
             try:
                 res = cls._call_serpapi_google_lens(imagens[0].imagem.path, serpapi_key)
@@ -68,7 +74,7 @@ class VisualSearchService:
             except Exception as e:
                 logger.error(f"Erro no SerpApi Google Lens: {e}")
 
-        return {
+        return lens_native_res if lens_native_res.get('success') else {
             "success": False,
             "provider": "none",
             "produto_identificado": "",
@@ -79,6 +85,60 @@ class VisualSearchService:
             "labels": [],
             "urls_diretas": []
         }
+
+    @classmethod
+    def _call_chrome_lens_native(cls, image_path: str) -> Dict[str, Any]:
+        """
+        Executa a leitura direta do Google Lens usando o motor de Protobuf do Chromium (chrome-lens-py).
+        Zero chaves de API necessárias, zero custo, direto no Python.
+        """
+        try:
+            from chrome_lens_py import LensAPI
+            import asyncio
+            
+            async def _run():
+                lens = LensAPI()
+                return await lens.process_image(image_path)
+            
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as pool:
+                        res = pool.submit(asyncio.run, _run()).result()
+                else:
+                    res = loop.run_until_complete(_run())
+            except Exception:
+                res = asyncio.run(_run())
+
+            ocr_text = ""
+            if isinstance(res, dict):
+                ocr_text = res.get('ocr_text', '').strip()
+            
+            marca = ""
+            modelo = ""
+            if ocr_text:
+                words = ocr_text.split()
+                if len(words) == 1:
+                    marca = words[0].capitalize()
+                elif len(words) >= 2:
+                    marca = words[0].capitalize()
+                    modelo = " ".join(words[1:])
+            
+            return {
+                "success": bool(ocr_text),
+                "provider": "google_lens_native",
+                "ocr_text": ocr_text,
+                "produto_identificado": ocr_text,
+                "marca": marca,
+                "modelo": modelo,
+                "entidades": [ocr_text] if ocr_text else [],
+                "labels": [],
+                "urls_diretas": []
+            }
+        except Exception as e:
+            logger.warning(f"Google Lens nativo: {e}")
+            return {"success": False, "provider": "google_lens_native"}
 
     @classmethod
     def _call_google_vision_web_detection(cls, image_path: str, api_key: str) -> Dict[str, Any]:
