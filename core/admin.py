@@ -104,7 +104,7 @@ class ItemAdmin(admin.ModelAdmin):
         }),
     )
 
-    actions = ['processar_com_ia', 'aprovar_itens', 'marcar_como_vendidos', 'marcar_como_rascunho']
+    actions = ['processar_com_ia', 'processar_com_serpapi_lens', 'aprovar_itens', 'marcar_como_vendidos', 'marcar_como_rascunho']
 
     def thumbnail_preview(self, obj):
         img = obj.imagem_principal
@@ -147,12 +147,16 @@ class ItemAdmin(admin.ModelAdmin):
 
     def botoes_acao(self, obj):
         process_url = reverse('ai_engine:process_item', args=[obj.pk])
+        process_serpapi_url = f"{process_url}?serpapi=1"
         export_url = reverse('marketplace:export_modal', args=[obj.pk])
         delete_url = reverse('core:quick_delete_item', args=[obj.pk])
         return format_html(
             '<div class="admin-subtle-actions" style="display:inline-flex; align-items:center; gap:8px;">'
-            '<a href="{}" class="admin-subtle-btn admin-ai-action-btn" data-item-id="{}" data-item-title="{}" title="Processar com IA" style="display:inline-flex; width:18px; height:18px;">'
+            '<a href="{}" class="admin-subtle-btn admin-ai-action-btn" data-item-id="{}" data-item-title="{}" title="Processar com IA (Padrão Gratuito)" style="display:inline-flex; width:18px; height:18px; color:#6366f1;">'
             '<svg viewBox="0 0 24 24" style="width:17px; height:17px; min-width:17px; stroke:currentColor; fill:none; stroke-width:1.8;"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/><path d="M5 3v4"/><path d="M19 17v4"/></svg>'
+            '</a>'
+            '<a href="{}" class="admin-subtle-btn admin-ai-action-btn admin-serpapi-btn" data-item-id="{}" data-item-title="{}" data-serpapi="1" title="Análise Profunda Google Lens (SerpApi)" style="display:inline-flex; width:18px; height:18px; color:#d97706;">'
+            '<svg viewBox="0 0 24 24" style="width:17px; height:17px; min-width:17px; stroke:currentColor; fill:none; stroke-width:1.8;"><circle cx="12" cy="12" r="3"/><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/></svg>'
             '</a>'
             '<a href="{}" class="admin-subtle-btn admin-export-action-btn" title="Exportar Anúncio" style="display:inline-flex; width:18px; height:18px;">'
             '<svg viewBox="0 0 24 24" style="width:17px; height:17px; min-width:17px; stroke:currentColor; fill:none; stroke-width:1.8;"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>'
@@ -166,7 +170,9 @@ class ItemAdmin(admin.ModelAdmin):
             '<span class="delete-confirm-label">Excluir?</span>'
             '</button>'
             '</div>',
-            process_url, obj.pk, obj.titulo, export_url, obj.pk, obj.titulo, delete_url
+            process_url, obj.pk, obj.titulo,
+            process_serpapi_url, obj.pk, obj.titulo,
+            export_url, obj.pk, obj.titulo, delete_url
         )
     botoes_acao.short_description = "Ações Rápidas"
 
@@ -247,14 +253,23 @@ class ItemAdmin(admin.ModelAdmin):
         return format_html('<div style="background: #f8fafc; padding: 10px 14px; border-radius: 8px; border: 1px solid #e2e8f0;">{}</div>', format_html("".join(items_html)))
     urls_referencia_formatadas.short_description = "Links de Referência (Clicáveis)"
 
-    @admin.action(description="🤖 Processar selecionados com IA (Visão + Mercado + Copy)")
+    @admin.action(description="🤖 Processar selecionados com IA (Padrão Gratuito)")
     def processar_com_ia(self, request, queryset):
         processados = 0
         for item in queryset:
-            res = AIOrchestrator.process_item(item.id)
+            res = AIOrchestrator.process_item(item.id, use_serpapi=False)
             if res.get('success'):
                 processados += 1
-        self.message_user(request, f"{processados} item(ns) processado(s) pela pipeline de IA com sucesso.")
+        self.message_user(request, f"{processados} item(ns) processado(s) pela pipeline gratuita de IA com sucesso.")
+
+    @admin.action(description="🔍 Processar com Google Lens Profundo (SerpApi - On-Demand)")
+    def processar_com_serpapi_lens(self, request, queryset):
+        processados = 0
+        for item in queryset:
+            res = AIOrchestrator.process_item(item.id, use_serpapi=True)
+            if res.get('success'):
+                processados += 1
+        self.message_user(request, f"{processados} item(ns) processado(s) com Google Lens Profundo (SerpApi).")
 
     @admin.action(description="Aprovar itens selecionados (Publicar no Site)")
     def aprovar_itens(self, request, queryset):

@@ -11,6 +11,7 @@
 
     document.addEventListener('DOMContentLoaded', () => {
         initSubtleActions();
+        loadSerpApiQuota();
     });
 
     function initSubtleActions() {
@@ -220,9 +221,29 @@
 
         container.appendChild(toast);
 
-        setTimeout(() => {
-            toast.classList.add('toast-hide');
-            setTimeout(() => toast.remove(), 250);
-        }, 3600);
+    async function loadSerpApiQuota() {
+        const badges = document.querySelectorAll('.serpapi-quota-badge, #serpapi-quota-badge');
+        if (badges.length === 0) return;
+
+        try {
+            const resp = await fetch('/ai/serpapi-quota/');
+            if (resp.ok) {
+                const data = await resp.json();
+                const text = data.formatted || (data.available ? `${data.searches_left}/${data.searches_total} rest.` : '');
+                badges.forEach(b => {
+                    if (text) {
+                        b.textContent = text;
+                        b.style.display = 'inline-block';
+                        b.setAttribute('title', `Cota SerpApi: ${data.searches_left} restantes de ${data.searches_total} este mês (Usadas: ${data.this_month_usage})`);
+                    } else {
+                        b.style.display = 'none';
+                    }
+                });
+            }
+        } catch (e) {
+            console.debug('Não foi possível carregar cota SerpApi:', e);
+        }
     }
+
+    window.loadSerpApiQuota = loadSerpApiQuota;
 })();

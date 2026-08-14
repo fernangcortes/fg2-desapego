@@ -395,14 +395,26 @@
             this.setStatus('running');
             if (btnElement) btnElement.classList.add('is-running');
 
-            this.log(`target #${itemId}: <span class="term-highlight">"${itemTitle}"</span>`);
+            const isSerpApi = btnElement && (
+                btnElement.getAttribute('data-serpapi') === '1' ||
+                btnElement.classList.contains('admin-serpapi-btn') ||
+                (btnElement.getAttribute('href') && btnElement.getAttribute('href').includes('serpapi=1'))
+            );
+
+            const modeLabel = isSerpApi ? '<span style="color:#f59e0b;">[Google Lens SerpApi]</span>' : '<span style="color:#818cf8;">[IA Grátis]</span>';
+            this.log(`target #${itemId}: <span class="term-highlight">"${itemTitle}"</span> ${modeLabel}`);
 
             let stepIndex = 0;
-            const steps = [
-                'vision: analyzing photos via Gemini Multimodal...',
+            const steps = isSerpApi ? [
+                'lens: uploading photo to SerpApi Google Lens engine...',
+                'lens: analyzing 50+ visual matches and shopping links...',
+                'reasoner: extracting exact brand, model & specs...',
+                'sync: updating database records & marketplace links...'
+            ] : [
+                'lens: extracting OCR text via native Google Lens...',
+                'vision: analyzing photos via Vision & Gemini...',
                 'market: searching live quotes & specs in Brazil...',
-                'copy: generating tech specs and honest copy...',
-                'sync: updating database records & links...'
+                'copy: generating tech specs and honest copy...'
             ];
 
             const stepTimer = setInterval(() => {
@@ -413,7 +425,8 @@
             }, 1900);
 
             try {
-                const response = await fetch(`/ai/process/${itemId}/?format=json`, {
+                const processUrl = isSerpApi ? `/ai/process/${itemId}/?format=json&serpapi=1` : `/ai/process/${itemId}/?format=json`;
+                const response = await fetch(processUrl, {
                     headers: {
                         'Accept': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest'
@@ -442,6 +455,10 @@
 
                     this.updateTableRow(itemId, data);
                     this.updateFormFields(data);
+
+                    if (window.loadSerpApiQuota) {
+                        window.loadSerpApiQuota();
+                    }
                 } else {
                     this.setStatus('error');
                     this.log(`error: ${data.error || 'Falha no processamento'}`, 'err', true);

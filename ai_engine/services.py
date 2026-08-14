@@ -13,6 +13,49 @@ from core.models import Item, ImagemItem
 logger = logging.getLogger(__name__)
 
 
+class SerpApiService:
+    """
+    Serviço de consulta de cota e status da conta SerpApi (Google Lens).
+    """
+    _cached_quota: Optional[Dict[str, Any]] = None
+    _cached_time: float = 0.0
+
+    @classmethod
+    def get_account_quota(cls) -> Dict[str, Any]:
+        import time
+        now = time.time()
+        # Cache por 60 segundos para evitar chamadas redundantes
+        if cls._cached_quota and (now - cls._cached_time < 60):
+            return cls._cached_quota
+
+        api_config = getattr(settings, 'AI_CONFIG', {})
+        serpapi_key = api_config.get('SERPAPI_API_KEY')
+        if not serpapi_key:
+            return {"available": False, "searches_left": 0, "searches_total": 0, "formatted": ""}
+
+        try:
+            r = requests.get('https://serpapi.com/account', params={'api_key': serpapi_key}, timeout=5)
+            if r.status_code == 200:
+                d = r.json()
+                left = d.get('total_searches_left', d.get('plan_searches_left', 0))
+                total = d.get('searches_per_month', 250)
+                used = d.get('this_month_usage', 0)
+                quota_data = {
+                    "available": True,
+                    "searches_left": left,
+                    "searches_total": total,
+                    "this_month_usage": used,
+                    "formatted": f"{left}/{total} rest."
+                }
+                cls._cached_quota = quota_data
+                cls._cached_time = now
+                return quota_data
+        except Exception as e:
+            logger.warning(f"Erro ao consultar cota SerpApi: {e}")
+
+        return {"available": False, "searches_left": 0, "searches_total": 0, "formatted": ""}
+
+
 class VisualSearchService:
     """
     Serviço de Busca Visual Reversa (Estilo Google Lens / Google Cloud Vision / SerpApi).
@@ -20,7 +63,7 @@ class VisualSearchService:
     identificando códigos de modelo específicos (ex: 'Tomate MTG-164'), marcas reais e links diretos.
     """
     @classmethod
-    def search_by_image(cls, item: Item) -> Dict[str, Any]:
+    def search_by_image(cls, item: Item, use_serpapi: bool = False) -> Dict[str, Any]:
         api_config = getattr(settings, 'AI_CONFIG', {})
         google_vision_key = api_config.get('GOOGLE_VISION_API_KEY')
         gemini_key = api_config.get('GEMINI_API_KEY')
@@ -41,23 +84,23 @@ class VisualSearchService:
                 "urls_diretas": []
             }
 
-        # 1. SerpApi Google Lens Engine (API Oficial Dedicada do Google Lens)
-        if serpapi_key:
+        # 1. Modo On-Demand Premium: SerpApi Google Lens (se acionado explicitamente pelo botão)
+        if use_serpapi and serpapi_key:
             try:
                 res = cls._call_serpapi_google_lens(imagens[0].imagem.path, serpapi_key)
                 if res.get('success'):
-                    logger.info(f"SerpApi Google Lens identificou: '{res.get('produto_identificado')}' ({len(res.get('urls_diretas', []))} URLs)")
+                    logger.info(f"SerpApi Google Lens (On-Demand) identificou: '{res.get('produto_identificado')}' ({len(res.get('urls_diretas', []))} URLs)")
                     return res
             except Exception as e:
                 logger.error(f"Erro no SerpApi Google Lens: {e}")
 
-        # 2. Google Lens Nativo (chrome-lens-py / Chromium Protobuf Engine)
+        # 2. Modo Padrão Gratuito: Google Lens Nativo (chrome-lens-py / Chromium Protobuf Engine - 100% grátis)
         lens_native_res = cls._call_chrome_lens_native(imagens[0].imagem.path)
         if lens_native_res.get('success') and lens_native_res.get('ocr_text'):
             logger.info(f"Google Lens Nativo detectou OCR: '{lens_native_res.get('ocr_text')}'")
             return lens_native_res
 
-        # 3. Google Cloud Vision WEB_DETECTION + OCR + Labels (Nativo Google Cloud)
+        # 3. Modo Padrão Gratuito: Google Cloud Vision WEB_DETECTION + OCR + Labels (1.000 requisições grátis/mês)
         if google_vision_key:
             try:
                 res = cls._call_google_vision_web_detection(imagens[0].imagem.path, google_vision_key)
@@ -66,7 +109,7 @@ class VisualSearchService:
             except Exception as e:
                 logger.error(f"Erro no Google Cloud Vision Web Detection: {e}")
 
-        # 4. Gemini 3.7 Flash com Grounding Multimodal (Google Search Tool)
+        # 4. Modo Padrão Gratuito: Gemini 3.7 Flash com Grounding Multimodal
         if gemini_key:
             try:
                 res = cls._call_gemini_grounded_vision(imagens, gemini_key, item)
@@ -1079,16 +1122,17 @@ class AIOrchestrator:
     5. Notificação
     """
     @classmethod
-    def process_item(cls, item_id: int) -> Dict[str, Any]:
+    def process_item(cls, item_id: int, use_serpapi: bool = False) -> Dict[str, Any]:
         try:
             item = Item.objects.get(pk=item_id)
         except Item.DoesNotExist:
             return {"success": False, "error": f"Item {item_id} não encontrado."}
 
-        logger.info(f"Iniciando pipeline de IA para o Item ID {item_id}: {item.titulo}")
+        modo_txt = "Google Lens Profundo (SerpApi)" if use_serpapi else "Padrão Gratuito (Lens Nativo + Vision + Gemini)"
+        logger.info(f"Iniciando pipeline de IA [{modo_txt}] para o Item ID {item_id}: {item.titulo}")
 
-        # Passo 1: Busca Visual Reversa (Google Lens / Google Cloud Vision / Gemini Grounding)
-        visual_result = VisualSearchService.search_by_image(item)
+        # Passo 1: Busca Visual Reversa (Google Lens Nativo / SerpApi Lens se sob demanda)
+        visual_result = VisualSearchService.search_by_image(item, use_serpapi=use_serpapi)
         if visual_result.get("success"):
             logger.info(f"Busca visual reversa ({visual_result.get('provider')}): '{visual_result.get('produto_identificado')}'")
 
