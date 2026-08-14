@@ -1,7 +1,10 @@
-const CACHE_NAME = 'hub-desapego-v1';
+const CACHE_NAME = 'hub-desapego-v2';
 const STATIC_ASSETS = [
   '/',
-  '/upload/',
+  '/upload-rapido/',
+  '/static/css/ai-feedback.css',
+  '/static/js/ai-feedback.js',
+  '/static/js/photo-draft-storage.js',
   '/static/manifest.json',
   '/static/icons/icon-192.png',
   '/static/icons/icon-512.png',

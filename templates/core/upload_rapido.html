@@ -37,11 +37,19 @@
 
         <!-- Botões de Captura de Foto (Mobile Friendly) -->
         <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-            <h2 class="text-sm font-bold text-slate-700 uppercase tracking-wider">1. Fotos do Item</h2>
+            <div class="flex items-center justify-between">
+                <h2 class="text-sm font-bold text-slate-700 uppercase tracking-wider">1. Fotos do Item</h2>
+                <button type="button" id="clearDraftBtn" class="hidden text-xs text-rose-600 hover:text-rose-700 font-semibold transition-colors flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    <span>Limpar fotos</span>
+                </button>
+            </div>
             
             <div class="grid grid-cols-2 gap-3">
                 <!-- Botão Câmera Traseira Nativa -->
-                <label for="cameraInput" class="flex flex-col items-center justify-center p-4 border-2 border-dashed border-emerald-400 bg-emerald-50/50 hover:bg-emerald-100/60 rounded-xl cursor-pointer active:scale-95 transition-all text-center group">
+                <label for="cameraInput" class="flex flex-col items-center justify-center p-4 border-2 border-dashed border-emerald-400 bg-emerald-50/50 hover:bg-emerald-100/60 rounded-xl cursor-pointer active:scale-95 transition-all text-center group select-none">
                     <div class="w-12 h-12 bg-emerald-600 group-hover:bg-emerald-700 text-white rounded-full flex items-center justify-center shadow-md mb-2 transition-colors">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -50,11 +58,10 @@
                     </div>
                     <span class="text-xs sm:text-sm font-bold text-emerald-950">Tirar Foto</span>
                     <span class="text-[10px] text-emerald-700">Abre a câmera</span>
-                    <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden">
                 </label>
 
                 <!-- Botão Galeria / Várias Fotos -->
-                <label for="galleryInput" class="flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 rounded-xl cursor-pointer active:scale-95 transition-all text-center group">
+                <label for="galleryInput" class="flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 rounded-xl cursor-pointer active:scale-95 transition-all text-center group select-none">
                     <div class="w-12 h-12 bg-slate-700 group-hover:bg-slate-800 text-white rounded-full flex items-center justify-center shadow-md mb-2 transition-colors">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -62,8 +69,17 @@
                     </div>
                     <span class="text-xs sm:text-sm font-bold text-slate-800">Galeria</span>
                     <span class="text-[10px] text-slate-500">Múltiplas fotos</span>
-                    <input type="file" id="galleryInput" accept="image/*" multiple class="hidden">
                 </label>
+            </div>
+
+            <!-- Inputs nativos fora das labels para evitar duplo disparo no mobile -->
+            <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden">
+            <input type="file" id="galleryInput" accept="image/*" multiple class="hidden">
+
+            <!-- Indicador de Processamento de Imagem -->
+            <div id="processingPhotoNotice" class="hidden p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs font-bold text-emerald-800 flex items-center gap-2">
+                <span class="btn-spinner"></span>
+                <span>Otimizando e salvando foto no dispositivo...</span>
             </div>
 
             <!-- Contador e Container de Previews -->
@@ -163,11 +179,8 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="/static/js/photo-draft-storage.js"></script>
 <script>
-    // Gerenciador de fotos em memória para suportar múltiplos cliques de câmera
-    let fileListAccumulator = [];
-    let selectedCoverIndex = 0;
-
     const cameraInput = document.getElementById('cameraInput');
     const galleryInput = document.getElementById('galleryInput');
     const finalFilesInput = document.getElementById('finalFilesInput');
@@ -175,73 +188,146 @@
     const previewSection = document.getElementById('previewSection');
     const previewGrid = document.getElementById('previewGrid');
     const photoCount = document.getElementById('photoCount');
+    const clearDraftBtn = document.getElementById('clearDraftBtn');
+    const processingNotice = document.getElementById('processingPhotoNotice');
     const submitBtn = document.getElementById('submitBtn');
     const uploadForm = document.getElementById('uploadForm');
     const loadingOverlay = document.getElementById('loadingOverlay');
 
-    function handleFilesAdded(newFiles) {
-        if (!newFiles || newFiles.length === 0) return;
-        
-        for (let i = 0; i < newFiles.length; i++) {
-            fileListAccumulator.push(newFiles[i]);
-        }
-        renderPreviews();
-    }
+    const tituloInput = document.getElementById('titulo_provisorio');
+    const categoriaInput = document.getElementById('categoria');
+    const tipoAnuncioInput = document.getElementById('tipo_anuncio');
+    const observacoesInput = document.getElementById('observacoes');
 
-    cameraInput.addEventListener('change', (e) => {
-        handleFilesAdded(e.target.files);
-        cameraInput.value = ''; // reseta para permitir tirar outra foto logo em seguida
+    // Inicialização e restauração do Rascunho
+    document.addEventListener('DOMContentLoaded', async () => {
+        // Restaura campos de texto salvos
+        const savedForm = PhotoDraftStorage.getFormState();
+        if (savedForm) {
+            if (savedForm.titulo && tituloInput) tituloInput.value = savedForm.titulo;
+            if (savedForm.categoria && categoriaInput) categoriaInput.value = savedForm.categoria;
+            if (savedForm.tipo_anuncio && tipoAnuncioInput) tipoAnuncioInput.value = savedForm.tipo_anuncio;
+            if (savedForm.observacoes && observacoesInput) observacoesInput.value = savedForm.observacoes;
+        }
+
+        // Restaura fotos salvas no IndexedDB
+        await refreshPhotosFromDB();
     });
 
-    galleryInput.addEventListener('change', (e) => {
-        handleFilesAdded(e.target.files);
+    // Salva estado dos campos conforme digitação
+    function persistFormInputs() {
+        PhotoDraftStorage.saveFormState({
+            titulo: tituloInput ? tituloInput.value : '',
+            categoria: categoriaInput ? categoriaInput.value : '',
+            tipo_anuncio: tipoAnuncioInput ? tipoAnuncioInput.value : '',
+            observacoes: observacoesInput ? observacoesInput.value : '',
+        });
+    }
+
+    [tituloInput, categoriaInput, tipoAnuncioInput, observacoesInput].forEach(el => {
+        if (el) {
+            el.addEventListener('input', persistFormInputs);
+            el.addEventListener('change', persistFormInputs);
+        }
+    });
+
+    async function handleFilesAdded(newFiles) {
+        if (!newFiles || newFiles.length === 0) return;
+
+        processingNotice.classList.remove('hidden');
+
+        try {
+            const currentPhotos = await PhotoDraftStorage.getAllPhotos();
+            const hasCover = currentPhotos.some(p => p.isCover);
+
+            for (let i = 0; i < newFiles.length; i++) {
+                const isFirst = (currentPhotos.length === 0 && i === 0) || (!hasCover && i === 0);
+                await PhotoDraftStorage.savePhoto(newFiles[i], isFirst);
+            }
+
+            await refreshPhotosFromDB();
+            AIFeedback.showToast(`${newFiles.length} foto(s) adicionada(s) ao rascunho.`, 'info', 2000);
+        } catch (error) {
+            console.error('Erro ao salvar foto:', error);
+            alert('Não foi possível salvar a imagem. Tente novamente.');
+        } finally {
+            processingNotice.classList.add('hidden');
+        }
+    }
+
+    cameraInput.addEventListener('change', async (e) => {
+        await handleFilesAdded(e.target.files);
+        cameraInput.value = '';
+    });
+
+    galleryInput.addEventListener('change', async (e) => {
+        await handleFilesAdded(e.target.files);
         galleryInput.value = '';
     });
 
-    function removePhoto(index) {
-        fileListAccumulator.splice(index, 1);
-        if (selectedCoverIndex >= fileListAccumulator.length) {
-            selectedCoverIndex = Math.max(0, fileListAccumulator.length - 1);
+    async function removePhoto(id) {
+        await PhotoDraftStorage.deletePhoto(id);
+        await refreshPhotosFromDB();
+    }
+
+    async function setCoverPhoto(id) {
+        await PhotoDraftStorage.setCoverPhoto(id);
+        await refreshPhotosFromDB();
+    }
+
+    clearDraftBtn.addEventListener('click', async () => {
+        if (confirm('Deseja remover todas as fotos deste rascunho?')) {
+            await PhotoDraftStorage.clearAll();
+            await refreshPhotosFromDB();
+            AIFeedback.showToast('Fotos removidas com sucesso.', 'info', 2000);
         }
-        renderPreviews();
-    }
+    });
 
-    function setCoverPhoto(index) {
-        selectedCoverIndex = index;
-        renderPreviews();
-    }
-
-    function renderPreviews() {
+    async function refreshPhotosFromDB() {
+        const photos = await PhotoDraftStorage.getAllPhotos();
         previewGrid.innerHTML = '';
-        const total = fileListAccumulator.length;
+        const total = photos.length;
 
         if (total === 0) {
             previewSection.classList.add('hidden');
+            clearDraftBtn.classList.add('hidden');
             submitBtn.disabled = true;
+            finalFilesInput.files = new DataTransfer().files;
             return;
         }
 
         previewSection.classList.remove('hidden');
+        clearDraftBtn.classList.remove('hidden');
         submitBtn.disabled = false;
-        photoCount.textContent = `${total} foto${total > 1 ? 's' : ''} selecionada${total > 1 ? 's' : ''}`;
-        capaIndexInput.value = selectedCoverIndex;
+        photoCount.textContent = `${total} foto${total > 1 ? 's' : ''} pronta${total > 1 ? 's' : ''}`;
 
-        // Cria o DataTransfer para sincronizar com o input que será enviado pelo formulário
+        // Sincroniza com o input do formulário via DataTransfer
         const dt = new DataTransfer();
-        fileListAccumulator.forEach(file => dt.items.add(file));
-        finalFilesInput.files = dt.files;
+        let coverIndex = 0;
 
-        fileListAccumulator.forEach((file, index) => {
-            const isCover = (index === selectedCoverIndex);
+        photos.forEach((record, index) => {
+            dt.items.add(record.file);
+            if (record.isCover) {
+                coverIndex = index;
+            }
+        });
+
+        finalFilesInput.files = dt.files;
+        capaIndexInput.value = coverIndex;
+
+        // Renderiza cada card de foto
+        photos.forEach((record) => {
+            const isCover = record.isCover;
             const card = document.createElement('div');
             card.className = `relative aspect-square rounded-xl overflow-hidden border-2 bg-slate-100 group transition-all ${
                 isCover ? 'border-emerald-500 ring-2 ring-emerald-400' : 'border-slate-200'
             }`;
 
             const img = document.createElement('img');
-            img.src = URL.createObjectURL(file);
+            img.src = URL.createObjectURL(record.file);
             img.className = 'w-full h-full object-cover cursor-pointer';
-            img.onclick = () => setCoverPhoto(index);
+            img.title = 'Clique para definir como capa';
+            img.onclick = () => setCoverPhoto(record.id);
 
             // Botão Remover (X)
             const removeBtn = document.createElement('button');
@@ -250,13 +336,13 @@
             removeBtn.innerHTML = '✕';
             removeBtn.onclick = (e) => {
                 e.stopPropagation();
-                removePhoto(index);
+                removePhoto(record.id);
             };
 
             // Badge de Capa
             if (isCover) {
                 const coverBadge = document.createElement('div');
-                coverBadge.className = 'absolute bottom-1 left-1 right-1 bg-emerald-600/90 text-white text-[10px] font-bold text-center py-0.5 rounded shadow';
+                coverBadge.className = 'absolute bottom-1 left-1 right-1 bg-emerald-600/90 text-white text-[10px] font-bold text-center py-0.5 rounded shadow pointer-events-none';
                 coverBadge.textContent = '★ Capa';
                 card.appendChild(coverBadge);
             }
@@ -267,12 +353,23 @@
         });
     }
 
-    uploadForm.addEventListener('submit', (e) => {
-        if (fileListAccumulator.length === 0) {
+    uploadForm.addEventListener('submit', async (e) => {
+        const photos = await PhotoDraftStorage.getAllPhotos();
+        if (!photos || photos.length === 0) {
             e.preventDefault();
-            alert('Por favor, adicione pelo menos uma foto.');
+            alert('Por favor, adicione pelo menos uma foto antes de salvar.');
             return;
         }
+
+        // Garante sincronização final do DataTransfer
+        const dt = new DataTransfer();
+        let coverIndex = 0;
+        photos.forEach((record, index) => {
+            dt.items.add(record.file);
+            if (record.isCover) coverIndex = index;
+        });
+        finalFilesInput.files = dt.files;
+        capaIndexInput.value = coverIndex;
 
         // Feedback imediato no botão
         submitBtn.disabled = true;

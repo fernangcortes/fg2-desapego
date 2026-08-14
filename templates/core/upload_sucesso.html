@@ -91,3 +91,15 @@
     </div>
 </div>
 {% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/photo-draft-storage.js"></script>
+<script>
+    // Limpa o rascunho anterior para que o próximo upload inicie limpo
+    document.addEventListener('DOMContentLoaded', async () => {
+        if (window.PhotoDraftStorage) {
+            await PhotoDraftStorage.clearAll();
+        }
+    });
+</script>
+{% endblock %}
