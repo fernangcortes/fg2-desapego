@@ -16,6 +16,9 @@ def clean_markdown_for_marketplace(text: str) -> str:
     """
     if not text:
         return ""
+    # Remove imagens Markdown ![...](...) e tags HTML <img>
+    text = re.sub(r"!\[.*?\]\(.*?\)", "", text)
+    text = re.sub(r"<img[^>]*>", "", text)
     # Remove cabeçalhos Markdown (#, ##, etc.)
     text = re.sub(r"(?m)^#{1,6}\s*", "", text)
     # Remove formatações de negrito, itálico e tachado
@@ -28,6 +31,7 @@ def clean_markdown_for_marketplace(text: str) -> str:
     # Limpa excesso de quebras de linha
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
+
 
 
 def format_for_olx(item: Item, base_url: str = "") -> str:

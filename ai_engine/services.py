@@ -940,7 +940,10 @@ class CopywritingService:
             "3. 🔍 **Transparência Total (Estado Real & Detalhes Visíveis)**: Detalhe de forma 100% honesta qualquer marca de uso, arranhão, desgaste ou detalhe apontado pela visão computacional ou pelo vendedor.\n"
             "4. 🎁 **Itens Inclusos**: Liste tudo o que acompanha o produto (cabos, adaptadores, capa, manuais, caixa).\n"
             "5. 🚚 **Condições de Retirada & Envio**: Informações práticas sobre retirada em mãos ou envio seguro.\n\n"
+            "REGRAS DE CONTEÚDO IMPORTANTES:\n"
+            "- NÃO inclua imagens em Markdown ![...](...) nem tags HTML <img> na descrição. As fotos do produto já são gerenciadas pela galeria do site. A descrição deve ser puramente textual (títulos, listas com marcadores, negrito e parágrafos).\n\n"
             "Retorne a resposta ESTRITAMENTE em formato JSON com o seguinte schema:\n"
+
             "{\n"
             '  "titulo": "Título objetivo e atrativo com marca, modelo e atributo principal (max 70 chars)",\n'
             '  "slug": "Slug amigável, simples, curto e limpo em minúsculas com hífens baseado no produto, marca e modelo (ex: \'fone-sennheiser-hd-400s\', \'suporte-tomate-mtg-164\', \'violao-yamaha-c40\')",\n'
@@ -992,8 +995,11 @@ class CopywritingService:
             "- 🔍 Transparência Total (Estado Real & Detalhes Visíveis)\n"
             "- 🎁 Itens Inclusos\n"
             "- 🚚 Condições de Retirada & Envio\n\n"
+            "REGRAS DE CONTEÚDO IMPORTANTES:\n"
+            "- NÃO inclua imagens em Markdown ![...](...) nem tags HTML <img> na descrição. As fotos do produto são gerenciadas pela galeria do site. A descrição deve ser puramente textual (títulos, listas com marcadores, negrito e parágrafos).\n\n"
             "Retorne ESTRITAMENTE em formato JSON com as chaves:\n"
             "titulo (string até 70 chars), slug (slug amigável curto em minúsculas com hífens como 'fone-sennheiser-hd-400s'), descricao (string completa), preco_usado (float), preco_novo (float), preco_aluguel (float)."
+
         )
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
@@ -1175,7 +1181,12 @@ class AIOrchestrator:
             item.slug = item.generate_unique_slug(copy_result['titulo'])
 
         if copy_result.get('descricao'):
-            item.descricao_ia = copy_result['descricao']
+            raw_desc = copy_result['descricao']
+            # Remove qualquer tag de imagem Markdown ![...](...) ou HTML <img...>
+            clean_desc = re.sub(r'!\[.*?\]\(.*?\)', '', raw_desc)
+            clean_desc = re.sub(r'<img[^>]*>', '', clean_desc)
+            item.descricao_ia = clean_desc.strip()
+
 
         if copy_result.get('preco_usado'):
             item.preco_usado = copy_result['preco_usado']

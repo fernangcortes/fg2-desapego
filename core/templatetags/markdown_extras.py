@@ -7,6 +7,8 @@ register = template.Library()
 
 # Instância reutilizável do parser Markdown seguro (desabilita HTML cru para evitar XSS e ativa quebras de linha automáticas)
 _md_parser = MarkdownIt("commonmark", {"breaks": True, "html": False})
+# Desabilita renderização de tags de imagem inline (as fotos do produto pertencem à galeria oficial do site)
+_md_parser.disable("image")
 
 
 @register.filter(name="render_markdown")
@@ -14,19 +16,24 @@ def render_markdown(value: str) -> str:
     """
     Renderiza texto em Markdown (gerado pela IA ou manual) em HTML formatado e seguro.
     Normaliza marcadores de lista unicode (•) e títulos com marcações redundantes.
+    Remove qualquer tag de imagem Markdown/HTML para não quebrar o layout.
     """
     if not value or not isinstance(value, str):
         return ""
 
     text = value
 
-    # 1. Normaliza marcadores de tópicos unicode (•, ●, ▪) para listas Markdown padrão (- )
+    # 1. Remove qualquer marcação de imagem Markdown ![...](...) e tags HTML <img>
+    text = re.sub(r"!\[.*?\]\(.*?\)", "", text)
+    text = re.sub(r"<img[^>]*>", "", text)
+
+    # 2. Normaliza marcadores de tópicos unicode (•, ●, ▪) para listas Markdown padrão (- )
     text = re.sub(r"(?m)^\s*[•●▪]\s+", "- ", text)
 
-    # 2. Limpa asteriscos redundantes dentro de títulos Markdown (ex: ## **Título** -> ## Título)
+    # 3. Limpa asteriscos redundantes dentro de títulos Markdown (ex: ## **Título** -> ## Título)
     text = re.sub(r"(?m)^(#{1,6}\s+)\*\*(.*?)\*\*", r"\1\2", text)
 
-    # 3. Renderiza Markdown para HTML
+    # 4. Renderiza Markdown para HTML
     html = _md_parser.render(text)
 
     return mark_safe(html)
@@ -35,7 +42,7 @@ def render_markdown(value: str) -> str:
 @register.filter(name="strip_markdown")
 def strip_markdown(value: str) -> str:
     """
-    Remove todos os símbolos e delimitadores Markdown (#, **, *, _, ~~, marcadores de lista),
+    Remove todos os símbolos e delimitadores Markdown (#, **, *, _, ~~, imagens, marcadores de lista),
     retornando texto puro limpo ideal para resumos em cards, tags meta e mensagens.
     """
     if not value or not isinstance(value, str):
@@ -43,9 +50,14 @@ def strip_markdown(value: str) -> str:
 
     text = value
 
+    # Remove imagens Markdown ![...](...) e tags HTML <img>
+    text = re.sub(r"!\[.*?\]\(.*?\)", "", text)
+    text = re.sub(r"<img[^>]*>", "", text)
+
     # Remove blocos de código
     text = re.sub(r"```[\s\S]*?```", "", text)
     text = re.sub(r"`([^`]+)`", r"\1", text)
+
 
     # Remove cabeçalhos Markdown (#, ##, ###, etc.)
     text = re.sub(r"(?m)^#{1,6}\s*", "", text)

@@ -238,13 +238,18 @@
 
         let text = md;
 
-        // 1. Normaliza marcadores de tópicos unicode
+        // 1. Remove qualquer marcação de imagem Markdown ![...](...) e tags HTML <img>
+        text = text.replace(/!\[.*?\]\(.*?\)/g, '');
+        text = text.replace(/<img[^>]*>/g, '');
+
+        // 2. Normaliza marcadores de tópicos unicode
         text = text.replace(/^[ \t]*[•●▪][ \t]+/gm, '- ');
 
-        // 2. Limpa asteriscos redundantes dentro de títulos (ex: ## **Título** -> ## Título)
+        // 3. Limpa asteriscos redundantes dentro de títulos (ex: ## **Título** -> ## Título)
         text = text.replace(/^(#{1,6}[ \t]+)\*\*(.*?)\*\*/gm, '$1$2');
 
         const escapeHtml = (str) =>
+
             str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
         const inlineFormat = (str) => {

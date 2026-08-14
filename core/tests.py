@@ -365,5 +365,24 @@ class HubDesapegoCoreTests(TestCase):
         # Ensure raw markdown headers are not displayed as literal text
         self.assertNotContains(resp, "## 📦 **Visão Geral**")
 
+    def test_markdown_extras_strips_images(self):
+        from core.templatetags.markdown_extras import render_markdown, strip_markdown
+        sample = (
+            "## 📦 **Visão Geral**\n"
+            "Fone Sennheiser HD 400S.\n\n"
+            "![Sennheiser HD 400S](https://m.media-amazon.com/images/I/41Xy6k+5Z+L._AC_SL1500_.jpg)\n"
+            '<img src="https://img.com/test.png" alt="Test">'
+        )
+        html = render_markdown(sample)
+        self.assertNotIn("<img", html)
+        self.assertNotIn("media-amazon.com", html)
+        self.assertIn("Fone Sennheiser HD 400S", html)
+
+        plain = strip_markdown(sample)
+        self.assertNotIn("media-amazon.com", plain)
+        self.assertNotIn("<img", plain)
+        self.assertNotIn("![", plain)
+
+
 
 
