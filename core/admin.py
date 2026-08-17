@@ -320,6 +320,10 @@ class ConfiguracaoVendedorAdmin(admin.ModelAdmin):
             'fields': ('chave_pix',),
             'description': "Chave PIX que pode ser exibida aos interessados."
         }),
+        ("Padrão de Retirada & Envio", {
+            'fields': ('condicoes_retirada_envio',),
+            'description': "Texto padrão inserido automaticamente no rodapé das descrições dos anúncios gerados (Markdown suportado)."
+        }),
     )
 
     def has_add_permission(self, request):

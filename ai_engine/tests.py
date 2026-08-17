@@ -426,4 +426,41 @@ class AIEngineServicesTests(TestCase):
         self.assertEqual(data.get("imported"), 2)
         self.assertEqual(self.item.imagens.count(), initial_count + 2)
 
+    def test_copywriting_includes_standard_shipping(self):
+        vision_data = {
+            "produto_identificado": "Violão Yamaha C40",
+            "marca": "Yamaha",
+            "modelo": "C40",
+            "categoria_sugerida": "instrumentos",
+            "estado_conservacao": "bom",
+            "defeitos_visiveis": "Nenhum defeito",
+            "acessorios_visiveis": "Capa",
+            "especificacoes_visiveis": "Nylon"
+        }
+        market_data = {
+            "preco_novo_estimado": 800.0,
+            "preco_usado_medio": 450.0,
+            "urls_referencia": []
+        }
+        result = CopywritingService.generate_listing_copy(vision_data, market_data)
+        self.assertIn("## 🚚 **Condições de Retirada & Envio**", result["descricao"])
+        self.assertIn("Retirada em mãos:", result["descricao"])
+        self.assertIn("Envio:", result["descricao"])
+        self.assertIn("Garantia:", result["descricao"])
+        self.assertIn("**Nota:** Este anúncio é transparente", result["descricao"])
+
+    def test_clean_and_append_standard_shipping_removes_ai_variations(self):
+        sample_ai_desc = (
+            "📦 **Visão Geral**\nFone de ouvido.\n\n"
+            "📋 **Ficha Técnica**\n- Driver 40mm\n\n"
+            "🚚 **Condições de Retirada & Envio:**\n"
+            "Entrego na estação de metrô mais próxima."
+        )
+        cleaned = CopywritingService._clean_and_append_standard_shipping(sample_ai_desc)
+        self.assertNotIn("Entrego na estação de metrô", cleaned)
+        self.assertIn("## 🚚 **Condições de Retirada & Envio**", cleaned)
+        self.assertIn("Retirada em mãos:", cleaned)
+        self.assertIn("Envio:", cleaned)
+        self.assertIn("Garantia:", cleaned)
+
 

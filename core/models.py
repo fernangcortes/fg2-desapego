@@ -3,6 +3,16 @@ from django.db import models
 from django.utils.text import slugify
 
 
+PADRAO_CONDICOES_RETIRADA_ENVIO = (
+    "## 🚚 **Condições de Retirada & Envio**\n\n"
+    "- **Retirada em mãos:** Combinar local e horário com o vendedor. O pagamento pode ser em dinheiro ou Pix.\n"
+    "- **Envio:** Por Correios (PAC ou SEDEX) mediante pagamento do frete. O produto será embalado com proteção para evitar danos no transporte.\n"
+    "- **Garantia:** Não há garantia, mas o produto é testado e funcionando. Em caso de defeito no envio, o vendedor se responsabiliza.\n\n"
+    "---\n\n"
+    "**Nota:** Este anúncio é transparente quanto ao estado do produto. Qualquer dúvida, entre em contato. O modelo exato pode ser confirmado pelo vendedor se necessário."
+)
+
+
 class ConfiguracaoVendedor(models.Model):
     """
     Configurações gerais de contato e dados do vendedor (Singleton).
@@ -46,6 +56,12 @@ class ConfiguracaoVendedor(models.Model):
         verbose_name="Tempo de Espera para Busca do Título (segundos)",
         help_text="Intervalo sem digitação para pesquisar na internet (padrão: 2.0s). Use 0 para desativar a busca automática e permitir apenas busca manual clicando no ícone."
     )
+    condicoes_retirada_envio = models.TextField(
+        blank=True,
+        default=PADRAO_CONDICOES_RETIRADA_ENVIO,
+        verbose_name="Condições de Retirada & Envio (Padrão)",
+        help_text="Texto padrão anexado automaticamente ao final das descrições geradas para os anúncios (Markdown suportado)."
+    )
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
 
@@ -60,6 +76,12 @@ class ConfiguracaoVendedor(models.Model):
     def get_solo(cls):
         obj, _ = cls.objects.get_or_create(id=1)
         return obj
+
+    def get_condicoes_retirada_envio(self) -> str:
+        """Retorna o texto de condições de envio/retirada configurado ou o padrão oficial."""
+        if self.condicoes_retirada_envio and self.condicoes_retirada_envio.strip():
+            return self.condicoes_retirada_envio.strip()
+        return PADRAO_CONDICOES_RETIRADA_ENVIO
 
 
 class Item(models.Model):

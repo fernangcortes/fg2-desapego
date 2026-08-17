@@ -8,7 +8,7 @@ from typing import Dict, Any, List, Optional
 import requests
 from django.conf import settings
 from django.utils.text import slugify
-from core.models import Item, ImagemItem
+from core.models import Item, ImagemItem, ConfiguracaoVendedor, PADRAO_CONDICOES_RETIRADA_ENVIO
 
 logger = logging.getLogger(__name__)
 
@@ -1156,6 +1156,12 @@ class MarketSearchService:
             if t_url and t_url.startswith('http') and t_url not in all_image_urls:
                 all_image_urls.append(t_url)
 
+        # Obtém o texto padrão de condições de retirada e envio do vendedor
+        try:
+            condicoes_envio_txt = ConfiguracaoVendedor.get_solo().get_condicoes_retirada_envio()
+        except Exception:
+            condicoes_envio_txt = PADRAO_CONDICOES_RETIRADA_ENVIO
+
         # Gera descrição estruturada com ficha técnica e transparência
         desc_lines = [
             f"📦 **Visão Geral**: {suggested_title}",
@@ -1179,8 +1185,7 @@ class MarketSearchService:
             "🎁 **Itens Inclusos**:",
             "- Acompanha o produto conforme fotos e especificações originais.",
             "",
-            "🚚 **Condições de Retirada & Envio**:",
-            "- Retirada presencial ou envio com embalagem reforçada."
+            condicoes_envio_txt
         ])
         suggested_description = "\n".join(desc_lines)
 
@@ -1233,6 +1238,37 @@ class CopywritingService:
     Gera Título Otimizado, Descrição Estruturada com Ficha Técnica Exata e Sugestão de Preços Justos.
     """
     @classmethod
+    def _clean_and_append_standard_shipping(cls, desc: str, condicoes_padrao: Optional[str] = None) -> str:
+        """
+        Garante que a descrição gerada não contenha seções geradas arbitrariamente pela IA
+        para entrega/retirada/garantia e anexa o bloco padrão oficial do vendedor no final.
+        """
+        if condicoes_padrao is None:
+            try:
+                condicoes_padrao = ConfiguracaoVendedor.get_solo().get_condicoes_retirada_envio()
+            except Exception:
+                condicoes_padrao = PADRAO_CONDICOES_RETIRADA_ENVIO
+
+        if not desc:
+            return condicoes_padrao
+
+        # Remove seções pré-existentes ou arbitrárias de retirada/envio geradas pela IA
+        patterns_to_remove = [
+            r"(?is)\n*(?:#{1,6}\s*)?🚚\s*\*\*Condições de Retirada[^\n]*\*\*.*$",
+            r"(?is)\n*(?:5\.\s*)?🚚\s*\*\*Condições de Retirada[^\n]*\*\*.*$",
+            r"(?is)\n*🚚\s*\*\*Condições de Retirada.*$",
+            r"(?is)\n*Condições de Retirada & Envio:?.*$",
+        ]
+        cleaned = desc.strip()
+        for pat in patterns_to_remove:
+            cleaned = re.sub(pat, "", cleaned).strip()
+
+        if condicoes_padrao in cleaned:
+            return cleaned
+
+        return f"{cleaned}\n\n{condicoes_padrao}".strip()
+
+    @classmethod
     def generate_listing_copy(
         cls,
         vision_data: Dict[str, Any],
@@ -1243,20 +1279,28 @@ class CopywritingService:
         deepseek_key = api_config.get('DEEPSEEK_API_KEY')
         gemini_key = api_config.get('GEMINI_API_KEY')
 
+        result = None
         if deepseek_key:
             try:
-                return cls._call_deepseek_copywriting(vision_data, market_data, observacoes_vendedor, deepseek_key)
+                result = cls._call_deepseek_copywriting(vision_data, market_data, observacoes_vendedor, deepseek_key)
             except Exception as e:
                 logger.error(f"Erro no DeepSeek Copywriting: {e}")
 
-        if gemini_key:
+        if not result and gemini_key:
             try:
-                return cls._call_gemini_copywriting(vision_data, market_data, observacoes_vendedor, gemini_key)
+                result = cls._call_gemini_copywriting(vision_data, market_data, observacoes_vendedor, gemini_key)
             except Exception as e:
                 logger.error(f"Erro no Gemini Copywriting: {e}")
 
-        # Fallback de copywriting estruturado e honesto
-        return cls._fallback_copywriting(vision_data, market_data, observacoes_vendedor)
+        if not result:
+            # Fallback de copywriting estruturado e honesto
+            result = cls._fallback_copywriting(vision_data, market_data, observacoes_vendedor)
+
+        # Anexa o bloco padrão oficial e imutável de Condições de Retirada & Envio
+        if result and isinstance(result, dict) and 'descricao' in result:
+            result['descricao'] = cls._clean_and_append_standard_shipping(result['descricao'])
+
+        return result
 
     @classmethod
     def _call_deepseek_copywriting(
@@ -1275,12 +1319,11 @@ class CopywritingService:
             "1. 📦 **Visão Geral**: Resumo do produto, marca, modelo e principais destaques e usabilidade.\n"
             "2. 📋 **Ficha Técnica & Especificações Exatas**: Liste as especificações técnicas oficiais e reais do modelo identificado (ex: para áudio/fones: tipo de driver, resposta de frequência, impedância, conector P2/P10/Bluetooth/USB, microfone integrado, isolamento acústico, peso; para instrumentos: madeiras, captação, trastes; para informática/eletrônicos: processador, memória, tela, conexões; para suportes/eletros/ferramentas: dimensões, materiais, capacidade de peso, compatibilidade, voltagem, potência).\n"
             "3. 🔍 **Transparência Total (Estado Real & Detalhes Visíveis)**: Detalhe de forma 100% honesta qualquer marca de uso, arranhão, desgaste ou detalhe apontado pela visão computacional ou pelo vendedor.\n"
-            "4. 🎁 **Itens Inclusos**: Liste tudo o que acompanha o produto (cabos, adaptadores, capa, manuais, caixa).\n"
-            "5. 🚚 **Condições de Retirada & Envio**: Informações práticas sobre retirada em mãos ou envio seguro.\n\n"
+            "4. 🎁 **Itens Inclusos**: Liste tudo o que acompanha o produto (cabos, adaptadores, capa, manuais, caixa).\n\n"
+            "ATENÇÃO: NÃO inclua seções de retirada, frete, entrega ou garantia. Essas informações são padronizadas e serão inseridas automaticamente pelo sistema.\n\n"
             "REGRAS DE CONTEÚDO IMPORTANTES:\n"
             "- NÃO inclua imagens em Markdown ![...](...) nem tags HTML <img> na descrição. As fotos do produto já são gerenciadas pela galeria do site. A descrição deve ser puramente textual (títulos, listas com marcadores, negrito e parágrafos).\n\n"
             "Retorne a resposta ESTRITAMENTE em formato JSON com o seguinte schema:\n"
-
             "{\n"
             '  "titulo": "Título objetivo e atrativo com marca, modelo e atributo principal (max 70 chars)",\n'
             '  "slug": "Slug amigável, simples, curto e limpo em minúsculas com hífens baseado no produto, marca e modelo (ex: \'fone-sennheiser-hd-400s\', \'suporte-tomate-mtg-164\', \'violao-yamaha-c40\')",\n'
@@ -1326,17 +1369,16 @@ class CopywritingService:
             f"Dados Visuais: {json.dumps(vision_data, ensure_ascii=False)}\n"
             f"Pesquisa de Mercado: {json.dumps(market_data, ensure_ascii=False)}\n"
             f"Observações do Vendedor: {observacoes}\n\n"
-            "A descrição DEVE conter:\n"
+            "A descrição DEVE conter apenas as seguintes seções do produto:\n"
             "- 📦 Visão Geral\n"
             "- 📋 Ficha Técnica & Especificações Exatas (com dados reais e detalhados do modelo identificado)\n"
             "- 🔍 Transparência Total (Estado Real & Detalhes Visíveis)\n"
-            "- 🎁 Itens Inclusos\n"
-            "- 🚚 Condições de Retirada & Envio\n\n"
+            "- 🎁 Itens Inclusos\n\n"
+            "NÃO gere seção de entrega, retirada ou garantia (o sistema anexa automaticamente o padrão do vendedor).\n\n"
             "REGRAS DE CONTEÚDO IMPORTANTES:\n"
             "- NÃO inclua imagens em Markdown ![...](...) nem tags HTML <img> na descrição. As fotos do produto são gerenciadas pela galeria do site. A descrição deve ser puramente textual (títulos, listas com marcadores, negrito e parágrafos).\n\n"
             "Retorne ESTRITAMENTE em formato JSON com as chaves:\n"
             "titulo (string até 70 chars), slug (slug amigável curto em minúsculas com hífens como 'fone-sennheiser-hd-400s'), descricao (string completa), preco_usado (float), preco_novo (float), preco_aluguel (float)."
-
         )
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
@@ -1377,6 +1419,13 @@ class CopywritingService:
         preco_usado = market_data.get('preco_usado_medio') or round(preco_novo * 0.6, 2)
         preco_aluguel = round(preco_usado * 0.15, 2)
 
+        try:
+            condicoes_txt = ConfiguracaoVendedor.get_solo().get_condicoes_retirada_envio()
+        except Exception:
+            condicoes_txt = PADRAO_CONDICOES_RETIRADA_ENVIO
+
+        obs_txt = f"📝 **Observação do Vendedor:**\n{observacoes}\n\n" if observacoes else ""
+
         descricao = (
             f"📦 **Visão Geral:**\n"
             f"{prod} ({marca} {modelo}). Excelente oportunidade para aquisição com ótimo custo-benefício.\n\n"
@@ -1389,10 +1438,8 @@ class CopywritingService:
             f"{defeitos}\n\n"
             f"🎁 **Itens Inclusos:**\n"
             f"{acessorios}\n\n"
-            f"{'📝 Observação do Vendedor: ' + observacoes if observacoes else ''}\n\n"
-            f"🚚 **Condições de Retirada & Envio:**\n"
-            f"Retirada em mãos a combinar ou envio seguro para todo o Brasil. Pagamento via PIX.\n\n"
-            f"💬 *Fique à vontade para tirar dúvidas e negociar através dos nossos canais de contato!*"
+            f"{obs_txt}"
+            f"{condicoes_txt}"
         )
 
         # Monta título limpo sem redundâncias

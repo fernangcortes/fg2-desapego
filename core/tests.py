@@ -426,6 +426,25 @@ class HubDesapegoCoreTests(TestCase):
         self.assertContains(resp_admin, 'window.TITLE_SEARCH_CONFIG')
         self.assertContains(resp_admin, '2.5')
 
+    def test_condicoes_retirada_envio_padrao(self):
+        from .models import PADRAO_CONDICOES_RETIRADA_ENVIO
+        config = ConfiguracaoVendedor.get_solo()
+        self.assertIn("Condições de Retirada & Envio", config.condicoes_retirada_envio)
+        self.assertIn("Retirada em mãos:", config.condicoes_retirada_envio)
+        self.assertIn("Envio:", config.condicoes_retirada_envio)
+        self.assertIn("Garantia:", config.condicoes_retirada_envio)
+        self.assertEqual(config.get_condicoes_retirada_envio(), PADRAO_CONDICOES_RETIRADA_ENVIO)
+
+        # Teste com texto customizado
+        config.condicoes_retirada_envio = "## Envio Personalizado\n- Apenas retirada"
+        config.save()
+        self.assertEqual(config.get_condicoes_retirada_envio(), "## Envio Personalizado\n- Apenas retirada")
+
+        # Teste com campo vazio volta para o padrão oficial
+        config.condicoes_retirada_envio = "   "
+        config.save()
+        self.assertEqual(config.get_condicoes_retirada_envio(), PADRAO_CONDICOES_RETIRADA_ENVIO)
+
 
 
 
