@@ -392,6 +392,40 @@ class HubDesapegoCoreTests(TestCase):
         self.assertNotIn("<img", plain)
         self.assertNotIn("![", plain)
 
+    def test_tempo_espera_busca_titulo_config(self):
+        config = ConfiguracaoVendedor.get_solo()
+        self.assertEqual(float(config.tempo_espera_busca_titulo), 2.0)
+
+        config.tempo_espera_busca_titulo = 3.5
+        config.save()
+
+        refreshed = ConfiguracaoVendedor.get_solo()
+        self.assertEqual(float(refreshed.tempo_espera_busca_titulo), 3.5)
+
+        # Teste com 0 (desativado)
+        config.tempo_espera_busca_titulo = 0.0
+        config.save()
+        refreshed0 = ConfiguracaoVendedor.get_solo()
+        self.assertEqual(float(refreshed0.tempo_espera_busca_titulo), 0.0)
+
+    def test_upload_rapido_and_admin_title_search_config_injection(self):
+        self.client.force_login(self.admin_user)
+        config = ConfiguracaoVendedor.get_solo()
+        config.tempo_espera_busca_titulo = 2.5
+        config.save()
+
+        resp_upload = self.client.get('/upload/')
+        self.assertEqual(resp_upload.status_code, 200)
+        self.assertContains(resp_upload, 'window.TITLE_SEARCH_CONFIG')
+        self.assertContains(resp_upload, '2.5')
+
+        # Teste no Admin Change Form do Item
+        item = Item.objects.create(titulo="Item Teste Admin", preco_usado=100.0)
+        resp_admin = self.client.get(f'/admin/core/item/{item.pk}/change/')
+        self.assertEqual(resp_admin.status_code, 200)
+        self.assertContains(resp_admin, 'window.TITLE_SEARCH_CONFIG')
+        self.assertContains(resp_admin, '2.5')
+
 
 
 

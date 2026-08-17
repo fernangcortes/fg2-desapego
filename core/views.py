@@ -116,9 +116,11 @@ def upload_rapido(request):
         except ValueError:
             capa_index = 0
 
+        seller_config = ConfiguracaoVendedor.get_solo()
         if not imagens:
             messages.error(request, "Por favor, selecione ou tire pelo menos uma foto do item.")
             return render(request, 'core/upload_rapido.html', {
+                'configuracao': seller_config,
                 'categorias': Item.Categoria.choices,
                 'tipos_anuncio': Item.TipoAnuncio.choices,
             })
@@ -150,7 +152,9 @@ def upload_rapido(request):
             'total_fotos': len(imagens)
         })
 
+    seller_config = ConfiguracaoVendedor.get_solo()
     return render(request, 'core/upload_rapido.html', {
+        'configuracao': seller_config,
         'categorias': Item.Categoria.choices,
         'tipos_anuncio': Item.TipoAnuncio.choices,
     })

@@ -36,6 +36,14 @@
         initTitleSearch();
     });
 
+    function getDebounceDelay() {
+        if (window.TITLE_SEARCH_CONFIG && typeof window.TITLE_SEARCH_CONFIG.debounceSeconds !== 'undefined') {
+            const sec = parseFloat(window.TITLE_SEARCH_CONFIG.debounceSeconds);
+            if (!isNaN(sec)) return sec;
+        }
+        return 2.0; // Padrão 2.0 segundos
+    }
+
     function initTitleSearch() {
         const titleInputs = document.querySelectorAll('#id_titulo, #titulo_provisorio, input[name="titulo"]');
         titleInputs.forEach(input => setupTitleSearchForInput(input));
@@ -55,24 +63,46 @@
             wrapper = newWrapper;
         }
 
-        // Cria indicador sutil de loading
-        const indicator = document.createElement('div');
-        indicator.className = 'title-search-indicator';
-        indicator.innerHTML = `
+        // Cria botão/ícone sutil de busca com metamorfose de linha para spinner circular
+        const searchBtn = document.createElement('button');
+        searchBtn.type = 'button';
+        searchBtn.className = 'title-search-btn';
+        searchBtn.setAttribute('aria-label', 'Pesquisar produto na internet');
+        
+        const debounceSec = getDebounceDelay();
+        if (debounceSec === 0) {
+            searchBtn.title = 'Pesquisar produto na internet (busca automática desativada - clique para buscar)';
+        } else {
+            searchBtn.title = `Pesquisar produto na internet (${debounceSec.toFixed(1)}s sem digitar ou clique)`;
+        }
+
+        searchBtn.innerHTML = `
             <svg viewBox="0 0 24 24">
-                <circle cx="12" cy="12" r="10"></circle>
-                <path d="M12 2a10 10 0 0 1 10 10"></path>
+                <circle class="title-search-svg-circle" cx="11" cy="11" r="7.5"></circle>
+                <path class="title-search-svg-handle" d="m21 21-4.35-4.35"></path>
             </svg>
-            <span>Pesquisando na internet...</span>
         `;
-        wrapper.appendChild(indicator);
+        wrapper.appendChild(searchBtn);
 
         // Cria o popover flutuante
         const popover = document.createElement('div');
         popover.className = 'title-search-popover';
         wrapper.appendChild(popover);
 
-        // Escuta digitação com debounce
+        // Disparo manual ao clicar no ícone
+        searchBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const query = input.value.trim();
+            if (query.length >= 3) {
+                if (debounceTimer) clearTimeout(debounceTimer);
+                executeInternetSearch(query, input, searchBtn, popover, true);
+            } else {
+                input.focus();
+            }
+        });
+
+        // Escuta digitação com debounce configurável
         input.addEventListener('input', (e) => {
             if (isApplying) return;
 
@@ -81,7 +111,7 @@
             if (debounceTimer) clearTimeout(debounceTimer);
 
             if (query.length < 3) {
-                indicator.classList.remove('is-visible');
+                searchBtn.classList.remove('is-loading');
                 closePopover(popover);
                 lastSearchedQuery = '';
                 return;
@@ -89,15 +119,27 @@
 
             if (query === lastSearchedQuery) return;
 
-            indicator.classList.remove('is-visible');
+            const currentDelay = getDebounceDelay();
+            if (currentDelay <= 0) {
+                // Busca automática desativada (0s). Permite busca apenas manual por clique ou Enter.
+                return;
+            }
+
             debounceTimer = setTimeout(() => {
-                executeInternetSearch(query, input, indicator, popover);
-            }, 450);
+                executeInternetSearch(query, input, searchBtn, popover, false);
+            }, Math.round(currentDelay * 1000));
         });
 
-        // Fecha com Escape
+        // Dispara com Enter ou fecha com Escape
         input.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
+            if (e.key === 'Enter') {
+                const query = input.value.trim();
+                if (query.length >= 3) {
+                    e.preventDefault();
+                    if (debounceTimer) clearTimeout(debounceTimer);
+                    executeInternetSearch(query, input, searchBtn, popover, true);
+                }
+            } else if (e.key === 'Escape') {
                 closePopover(popover);
             }
         });
@@ -112,15 +154,16 @@
         });
     }
 
-    async function executeInternetSearch(query, input, indicator, popover) {
+    async function executeInternetSearch(query, input, searchBtn, popover, force = false) {
         if (isApplying) return;
+        if (!force && query === lastSearchedQuery && popover.classList.contains('is-open')) return;
 
         if (currentAbortController) {
             currentAbortController.abort();
         }
         currentAbortController = new AbortController();
 
-        indicator.classList.add('is-visible');
+        searchBtn.classList.add('is-loading');
         lastSearchedQuery = query;
 
         try {
@@ -137,7 +180,7 @@
             }
 
             const data = await response.json();
-            indicator.classList.remove('is-visible');
+            searchBtn.classList.remove('is-loading');
 
             if (data.success && (data.total > 0 || (data.suggestion && data.suggestion.titulo))) {
                 renderPopoverContent(data, input, popover);
@@ -148,7 +191,7 @@
         } catch (err) {
             if (err.name !== 'AbortError') {
                 console.debug('Erro ao pesquisar título na internet:', err);
-                indicator.classList.remove('is-visible');
+                searchBtn.classList.remove('is-loading');
             }
         }
     }

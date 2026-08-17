@@ -183,6 +183,11 @@
 {% endblock %}
 
 {% block extra_js %}
+<script>
+    window.TITLE_SEARCH_CONFIG = {
+        debounceSeconds: {{ configuracao.tempo_espera_busca_titulo|default:2.0|stringformat:".1f" }}
+    };
+</script>
 <script src="/static/js/photo-draft-storage.js"></script>
 <script src="/static/js/admin_title_search.js"></script>
 <script>

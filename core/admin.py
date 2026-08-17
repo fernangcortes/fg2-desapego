@@ -256,6 +256,11 @@ class ItemAdmin(admin.ModelAdmin):
         return format_html('<div style="background: #f8fafc; padding: 10px 14px; border-radius: 8px; border: 1px solid #e2e8f0;">{}</div>', format_html("".join(items_html)))
     urls_referencia_formatadas.short_description = "Links de Referência (Clicáveis)"
 
+    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+        extra_context = extra_context or {}
+        extra_context['seller_config'] = ConfiguracaoVendedor.get_solo()
+        return super().changeform_view(request, object_id, form_url, extra_context=extra_context)
+
     @admin.action(description="🤖 Processar selecionados com IA (Padrão Gratuito)")
     def processar_com_ia(self, request, queryset):
         processados = 0
@@ -274,7 +279,7 @@ class ItemAdmin(admin.ModelAdmin):
                 processados += 1
         self.message_user(request, f"{processados} item(ns) processado(s) com Google Lens Profundo (SerpApi).")
 
-    @admin.action(description="Aprovar itens selecionados (Publicar no Site)")
+    @admin.action(description="Aprovar itens selecionados para a vitrine pública")
     def aprovar_itens(self, request, queryset):
         count = 0
         for item in queryset:
@@ -299,6 +304,10 @@ class ConfiguracaoVendedorAdmin(admin.ModelAdmin):
     fieldsets = (
         ("Identificação do Vendedor", {
             'fields': ('nome_vendedor', 'mensagem_boas_vindas')
+        }),
+        ("Pesquisa & Automação de Título", {
+            'fields': ('tempo_espera_busca_titulo',),
+            'description': "Tempo sem digitação (segundos) para disparar a busca de referências e preços na internet (padrão: 2.0s). Defina 0 para desativar a busca automática e permitir apenas busca manual clicando no ícone do campo."
         }),
         ("Canais de Contato", {
             'fields': (

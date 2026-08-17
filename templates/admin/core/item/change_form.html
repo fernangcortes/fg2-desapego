@@ -1,6 +1,15 @@
 {% extends "admin/change_form.html" %}
 {% load i18n admin_urls static %}
 
+{% block extrahead %}
+  {{ block.super }}
+  <script>
+    window.TITLE_SEARCH_CONFIG = {
+      debounceSeconds: {{ seller_config.tempo_espera_busca_titulo|default:2.0|stringformat:".1f" }}
+    };
+  </script>
+{% endblock %}
+
 {% block object-tools-items %}
   {% if original.pk %}
     <li>

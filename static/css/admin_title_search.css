@@ -23,41 +23,100 @@ fieldset,
     z-index: 50;
 }
 
-/* Indicador sutil de busca no campo de digitação */
-.title-search-indicator {
+/* Garante que o texto digitado nunca passe por baixo do ícone */
+.title-search-field-wrapper input {
+    padding-right: 38px !important;
+}
+
+/* Botão Line-Icon Sutil de Busca e Indicador Morfante */
+.title-search-btn {
     position: absolute;
-    right: 10px;
+    right: 8px;
     top: 50%;
     transform: translateY(-50%);
+    width: 28px;
+    height: 28px;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    font-size: 11px;
-    font-weight: 600;
-    color: #4338ca;
-    background: #eef2ff;
-    border: 1px solid #c7d2fe;
-    padding: 3px 8px;
-    border-radius: 9999px;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-    z-index: 5;
+    justify-content: center;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 6px;
+    padding: 0 !important;
+    color: #94a3b8;
+    cursor: pointer;
+    z-index: 6;
+    transition: color 0.2s ease, background-color 0.2s ease, transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
-.title-search-indicator.is-visible {
-    opacity: 1;
+.title-search-btn:hover:not(.is-loading) {
+    color: #4f46e5;
+    background-color: rgba(99, 102, 241, 0.08) !important;
+    transform: translateY(-50%) scale(1.08);
 }
 
-.title-search-indicator svg {
-    width: 13px;
-    height: 13px;
+.title-search-btn:active:not(.is-loading) {
+    transform: translateY(-50%) scale(0.92);
+}
+
+.title-search-btn.is-loading {
+    color: #4f46e5;
+    cursor: wait;
+}
+
+/* SVG Line-Icon Morphing: Linhas da Lupa se transformam no Spinner Circular */
+.title-search-btn svg {
+    width: 17px;
+    height: 17px;
     stroke: currentColor;
     fill: none;
     stroke-width: 1.8;
     stroke-linecap: round;
     stroke-linejoin: round;
-    animation: title-search-spin 0.7s linear infinite;
+    overflow: visible;
+}
+
+/* Círculo da Lupa / Spinner */
+.title-search-btn .title-search-svg-circle {
+    cx: 11;
+    cy: 11;
+    r: 7.5;
+    transform-origin: 11px 11px;
+    stroke-dasharray: 48 0;
+    stroke-dashoffset: 0;
+    transition: stroke-dasharray 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                stroke-dashoffset 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Cabo da Lupa */
+.title-search-btn .title-search-svg-handle {
+    transform-origin: 16.65px 16.65px;
+    stroke-dasharray: 10 0;
+    stroke-dashoffset: 0;
+    opacity: 1;
+    transform: scale(1);
+    transition: stroke-dashoffset 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.2s ease,
+                transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Estado Pesquisando: Animação e Rotação Suave sem corte brusco */
+.title-search-btn.is-loading svg {
+    animation: title-search-spin 0.85s linear infinite;
+    transform-origin: 11px 11px;
+}
+
+.title-search-btn.is-loading .title-search-svg-circle {
+    stroke-dasharray: 33 15;
+    stroke-dashoffset: 6;
+}
+
+.title-search-btn.is-loading .title-search-svg-handle {
+    stroke-dashoffset: 10;
+    opacity: 0;
+    transform: scale(0);
 }
 
 @keyframes title-search-spin {
@@ -675,4 +734,59 @@ fieldset,
     stroke-width: 1.8;
     stroke-linecap: round;
     stroke-linejoin: round;
+}
+
+/* ==========================================================================
+   Otimizações Responsivas Mobile
+   ========================================================================== */
+@media (max-width: 640px) {
+    .title-search-popover {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        right: 0;
+        width: 100%;
+        max-width: 100%;
+        max-height: 75vh;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        border-radius: 10px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25);
+    }
+
+    .title-search-fields-grid {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 8px !important;
+        padding: 10px 12px !important;
+    }
+
+    .title-search-photos-grid {
+        grid-template-columns: repeat(auto-fill, minmax(65px, 1fr)) !important;
+        gap: 6px !important;
+    }
+
+    .title-search-photo-card {
+        height: 65px !important;
+    }
+
+    .title-search-header {
+        padding: 8px 10px !important;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: #f8fafc;
+    }
+
+    .title-search-header-title {
+        font-size: 11px !important;
+        max-width: calc(100% - 30px);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .title-search-apply-all-btn {
+        padding: 9px 12px !important;
+        font-size: 12px !important;
+    }
 }

@@ -39,6 +39,13 @@ class ConfiguracaoVendedor(models.Model):
         default="Olá! Seja bem-vindo à nossa página de desapegos. Todos os itens foram bem cuidados.",
         verbose_name="Mensagem de Boas-Vindas"
     )
+    tempo_espera_busca_titulo = models.DecimalField(
+        max_digits=3,
+        decimal_places=1,
+        default=2.0,
+        verbose_name="Tempo de Espera para Busca do Título (segundos)",
+        help_text="Intervalo sem digitação para pesquisar na internet (padrão: 2.0s). Use 0 para desativar a busca automática e permitir apenas busca manual clicando no ícone."
+    )
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
 
