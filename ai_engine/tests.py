@@ -103,6 +103,32 @@ class AIEngineServicesTests(TestCase):
         self.assertEqual(result["produto_identificado"], "Suporte Articulado Tomate MTG-164")
         self.assertIn("https://www.mercadolivre.com.br/p/MLB99999", result["urls_diretas"])
 
+    @patch('requests.post')
+    def test_visual_search_gemini_grounded_vision(self, mock_post):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            'candidates': [{
+                'content': {
+                    'parts': [{
+                        'text': '{"produto_identificado": "Fone de Ouvido Intra-auricular", "marca": "Samsung", "modelo": "EHS64", "categoria_sugerida": "eletronicos", "urls_referencia": ["https://www.samsung.com/br/accessories"]}'
+                    }]
+                },
+                'groundingMetadata': {
+                    'groundingChunks': [{'web': {'uri': 'https://www.samsung.com/br/accessories'}}]
+                }
+            }]
+        }
+        mock_resp.raise_for_status = MagicMock()
+        mock_post.return_value = mock_resp
+
+        result = VisualSearchService._call_gemini_grounded_vision(self.item.imagens.all(), "fake_key", self.item)
+        self.assertTrue(result["success"])
+        self.assertEqual(result["provider"], "gemini_grounded_vision")
+        self.assertEqual(result["produto_identificado"], "Fone de Ouvido Intra-auricular")
+        self.assertEqual(result["marca"], "Samsung")
+        self.assertEqual(result["modelo"], "EHS64")
+        self.assertEqual(result["categoria_sugerida"], "eletronicos")
+
     def test_vision_service_fallback(self):
         # Sem API keys configuradas, deve retornar dados fallback coerentes
         result = VisionService.analyze_item_images(self.item)

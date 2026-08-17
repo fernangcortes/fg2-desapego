@@ -147,48 +147,50 @@
         }
     }
 
-    async function handleLensClick(btn) {
+    function handleLensClick(btn) {
         const relativeUrl = btn.getAttribute('data-image-url');
         if (!relativeUrl) return;
 
         // Monta a URL pública absoluta
         const fullUrl = window.location.origin + relativeUrl;
-        const lensUrl = `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(fullUrl)}`;
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const lensUrl = isLocalhost 
+            ? 'https://lens.google.com/' 
+            : `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(fullUrl)}`;
 
-        // Tenta copiar a imagem ou a URL para a área de transferência
-        let copied = false;
-        try {
-            if (navigator.clipboard && window.fetch) {
-                const imgResp = await fetch(relativeUrl);
-                const blob = await imgResp.blob();
-                // Converte para PNG garantido se suportado
-                if (window.ClipboardItem) {
-                    const pngBlob = blob.type === 'image/png' ? blob : new Blob([blob], { type: 'image/png' });
-                    await navigator.clipboard.write([
-                        new ClipboardItem({ 'image/png': pngBlob })
-                    ]);
-                    copied = true;
-                } else {
-                    await navigator.clipboard.writeText(fullUrl);
-                    copied = true;
-                }
-            }
-        } catch (e) {
-            try {
-                if (navigator.clipboard) {
-                    await navigator.clipboard.writeText(fullUrl);
-                    copied = true;
-                }
-            } catch (_) {}
+        // Abre a nova aba IMEDIATAMENTE (sincronamente) para evitar bloqueio de popup do navegador
+        const newWindow = window.open(lensUrl, '_blank', 'noopener,noreferrer');
+        if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+            // Se bloqueado pelo navegador, fallback para link direto
+            window.location.href = lensUrl;
         }
 
-        // Abre o Google Lens com a URL da imagem carregada
-        window.open(lensUrl, '_blank', 'noopener,noreferrer');
+        showAdminSubtleToast('🔍 Abrindo Google Lens...', false, '🔍');
 
-        const msg = copied 
-            ? '🔍 Abrindo Google Lens com a foto! (Imagem copiada para a área de transferência)'
-            : '🔍 Abrindo Google Lens com a imagem...';
-        showAdminSubtleToast(msg, false, '🔍');
+        // Copia a imagem ou URL para a área de transferência em segundo plano
+        (async () => {
+            try {
+                if (navigator.clipboard && window.fetch) {
+                    const imgResp = await fetch(relativeUrl);
+                    const blob = await imgResp.blob();
+                    if (window.ClipboardItem) {
+                        const pngBlob = blob.type === 'image/png' ? blob : new Blob([blob], { type: 'image/png' });
+                        await navigator.clipboard.write([
+                            new ClipboardItem({ 'image/png': pngBlob })
+                        ]);
+                        showAdminSubtleToast('✓ Foto copiada! Se desejar, cole (Ctrl+V) no Google Lens.', false, '📋');
+                    } else {
+                        await navigator.clipboard.writeText(fullUrl);
+                    }
+                }
+            } catch (e) {
+                try {
+                    if (navigator.clipboard) {
+                        await navigator.clipboard.writeText(fullUrl);
+                    }
+                } catch (_) {}
+            }
+        })();
     }
 
     function getCsrfToken() {

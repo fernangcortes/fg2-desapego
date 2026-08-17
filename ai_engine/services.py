@@ -94,29 +94,21 @@ class VisualSearchService:
             except Exception as e:
                 logger.error(f"Erro no SerpApi Google Lens: {e}")
 
-        # 2. Modo Padrão Gratuito: Google Lens Nativo (chrome-lens-py / Chromium Protobuf Engine - 100% grátis)
+        # 2. Modo Padrão Gratuito: Gemini 3.7 Flash com Grounding Multimodal & OCR Profundo (Principal motor visual inteligente)
+        if gemini_key:
+            try:
+                res = cls._call_gemini_grounded_vision(imagens, gemini_key, item)
+                if res.get('success') and res.get('produto_identificado'):
+                    logger.info(f"Gemini 3.7 Flash Multimodal identificou: '{res.get('produto_identificado')}' ({res.get('marca')} {res.get('modelo')})")
+                    return res
+            except Exception as e:
+                logger.error(f"Erro no Gemini Grounded Vision: {e}")
+
+        # 3. Modo Complementar: Google Lens Nativo (chrome-lens-py para OCR se Gemini falhar)
         lens_native_res = cls._call_chrome_lens_native(imagens[0].imagem.path)
         if lens_native_res.get('success') and lens_native_res.get('ocr_text'):
             logger.info(f"Google Lens Nativo detectou OCR: '{lens_native_res.get('ocr_text')}'")
             return lens_native_res
-
-        # 3. Modo Padrão Gratuito: Google Cloud Vision WEB_DETECTION + OCR + Labels (1.000 requisições grátis/mês)
-        if google_vision_key:
-            try:
-                res = cls._call_google_vision_web_detection(imagens[0].imagem.path, google_vision_key)
-                if res.get('success'):
-                    return res
-            except Exception as e:
-                logger.error(f"Erro no Google Cloud Vision Web Detection: {e}")
-
-        # 4. Modo Padrão Gratuito: Gemini 3.7 Flash com Grounding Multimodal
-        if gemini_key:
-            try:
-                res = cls._call_gemini_grounded_vision(imagens, gemini_key, item)
-                if res.get('success'):
-                    return res
-            except Exception as e:
-                logger.error(f"Erro no Gemini Grounded Vision: {e}")
 
         return lens_native_res if lens_native_res.get('success') else {
             "success": False,
@@ -294,20 +286,19 @@ class VisualSearchService:
         candidate_models = ["gemini-3.7-flash", "gemini-3.5-flash", "gemini-flash-latest"]
         parts = []
         prompt = (
-            "Você é um especialista em busca reversa visual (estilo Google Lens).\n"
-            "Analise estas fotos e use a ferramenta de busca do Google para encontrar o produto e modelo comercial EXATO no mercado brasileiro.\n"
-            "Identifique:\n"
-            "1. Nome completo e comercial do produto\n"
-            "2. Marca real do fabricante\n"
-            "3. Modelo exato (incluindo códigos como MTG-164, HD 400S, C40, etc.)\n"
-            "4. Categoria mais adequada\n"
-            "5. Links de referência de lojas ou marketplaces brasileiros onde este produto é vendido.\n\n"
+            "Você é um especialista em visão computacional e busca reversa visual para itens de desapego e marketplace no Brasil.\n"
+            "Analise estas fotos com atenção meticulosa aos detalhes físicos e realize OCR minucioso.\n\n"
+            "DIRETRIZES DE IDENTIFICAÇÃO E OCR:\n"
+            "1. OCR & Logotipos: Leia qualquer inscrição, relevo, etiqueta, serigrafia ou marca nos itens (ex: 'SAMSUNG', 'SONY', 'JBL', 'APPLE', 'XIAOMI', 'PHILIPS', 'EDIFIER', 'YAMAHA', 'BOSCH', 'DELL', 'LOGITECH', etc.).\n"
+            "2. Objeto Principal vs Fundo: Identifique o objeto em foco (ex: se for um fone de ouvido com fio sobre uma mesa, o produto é um 'Fone de Ouvido com Fio', NUNCA a mesa, garrafa, alimento ou eletrodoméstico de cozinha).\n"
+            "3. Conectores e Formato: Observe plugue P2/P3, USB-C, Lightning, cor, almofadas/borrachas e design do produto.\n"
+            "4. Validação de Coerência: Use bom senso - se o objeto é claramente um acessório de áudio/eletrônico, jamais classifique como alimentício ou maquinário pesado.\n\n"
             "Responda estritamente em formato JSON com as chaves:\n"
             "{\n"
-            '  "produto_identificado": "string",\n'
-            '  "marca": "string",\n'
-            '  "modelo": "string",\n'
-            '  "categoria_sugerida": "string",\n'
+            '  "produto_identificado": "Nome comercial preciso do produto (ex: Fone de Ouvido Intra-auricular com Fio)",\n'
+            '  "marca": "Marca do fabricante (ex: Samsung, Sony, JBL, Apple, etc. ou Genérica se sem marca)",\n'
+            '  "modelo": "Código ou linha do modelo (ex: EO-IA500, EHS64, MDR-EX15LP, etc.)",\n'
+            '  "categoria_sugerida": "eletronicos",\n'
             '  "urls_referencia": ["url1", "url2"]\n'
             "}"
         )
@@ -1501,7 +1492,7 @@ class AIOrchestrator:
                 vision_result["produto_identificado"] = visual_result["produto_identificado"]
 
         # Passo 3: Construção da Query Otimizada e Pesquisa de Mercado
-        search_query = MarketSearchService.build_search_query(vision_result, item.titulo, visual_hint=visual_result)
+        search_query = MarketSearchService.build_search_query(vision_result, visual_hint=visual_result)
         logger.info(f"Query otimizada construída para busca de mercado: '{search_query}'")
         market_result = MarketSearchService.search_market_prices(
             search_query,

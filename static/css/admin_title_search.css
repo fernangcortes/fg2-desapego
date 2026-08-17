@@ -4,10 +4,23 @@
    animações refinadas de admin_subtle_actions.css.
    ========================================================================== */
 
+/* Previne que containeres nativos do Django Admin cortem o popover */
+fieldset,
+.form-row,
+.field-box,
+.aligned,
+.field-titulo,
+.form-row.field-titulo,
+.module,
+.submit-row {
+    overflow: visible !important;
+}
+
 /* Wrapper de posicionamento relativo para o campo de título */
 .title-search-field-wrapper {
     position: relative;
     width: 100%;
+    z-index: 50;
 }
 
 /* Indicador sutil de busca no campo de digitação */
@@ -63,7 +76,7 @@
     border: 1px solid #cbd5e1;
     border-radius: 12px;
     box-shadow: 0 14px 35px -6px rgba(15, 23, 42, 0.16), 0 8px 12px -6px rgba(15, 23, 42, 0.08);
-    z-index: 10000;
+    z-index: 99999 !important;
     overflow: hidden;
     opacity: 0;
     transform: translateY(-6px) scale(0.985);
