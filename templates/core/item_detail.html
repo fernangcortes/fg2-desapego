@@ -5,175 +5,211 @@
 {% block title %}{{ item.titulo }} - Hub de Desapego{% endblock %}
 
 {% block content %}
-<div class="max-w-5xl mx-auto space-y-8">
+<div class="max-w-5xl mx-auto space-y-6">
     <!-- Breadcrumb e Status Staff -->
-    <div class="flex items-center justify-between text-xs text-slate-500">
-        <nav class="flex items-center gap-2">
+    <div class="flex items-center justify-between text-xs text-slate-500 gap-2">
+        <nav class="flex items-center gap-1.5 truncate">
             <a href="/" class="hover:text-emerald-600 transition-colors">Início</a>
             <span>/</span>
-            <a href="/?categoria={{ item.categoria }}" class="hover:text-emerald-600 transition-colors">{{ item.get_categoria_display }}</a>
-            <span>/</span>
-            <span class="text-slate-800 font-semibold truncate max-w-xs">{{ item.titulo }}</span>
+            <a href="/?categoria={{ item.categoria }}" class="hover:text-emerald-600 transition-colors truncate max-w-[100px] sm:max-w-none">{{ item.get_categoria_display }}</a>
+            <span class="hidden sm:inline">/</span>
+            <span class="text-slate-800 font-semibold truncate max-w-xs hidden sm:inline">{{ item.titulo }}</span>
         </nav>
         {% if user.is_staff %}
-            <div class="flex items-center flex-wrap gap-2">
+            <div class="flex items-center flex-wrap gap-1.5 flex-shrink-0">
                 <button type="button"
                     data-ai-process="{{ item.id }}"
                     data-ai-redirect="."
-                    class="px-2.5 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 rounded-lg font-bold text-xs transition-all flex items-center gap-1.5 active:scale-95 shadow-sm">
+                    class="px-2 py-1 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 rounded-lg font-bold text-[11px] transition-all flex items-center gap-1 active:scale-95 shadow-xs">
                     <span>🤖</span>
-                    <span>IA Grátis</span>
+                    <span class="hidden sm:inline">IA Grátis</span>
                 </button>
                 <button type="button"
                     data-ai-process="{{ item.id }}"
                     data-ai-serpapi="1"
                     data-ai-redirect="."
-                    class="px-2.5 py-1.5 bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200 rounded-lg font-bold text-xs transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
+                    class="px-2 py-1 bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200 rounded-lg font-bold text-[11px] transition-all flex items-center gap-1 active:scale-95 shadow-xs"
                     title="Executar busca visual reversa profunda com Google Lens (SerpApi)">
                     <span>🔍</span>
-                    <span>Google Lens Profundo</span>
-                    <span class="serpapi-quota-badge text-[10px] font-mono font-bold bg-amber-200/80 text-amber-900 px-1.5 py-0.5 rounded border border-amber-300">
+                    <span class="hidden sm:inline">Lens</span>
+                    <span class="serpapi-quota-badge text-[9px] font-mono font-bold bg-amber-200/80 text-amber-900 px-1 py-0.2 rounded border border-amber-300">
                         {{ serpapi_quota.formatted|default:"243/250 rest." }}
                     </span>
                 </button>
-                <a href="{% url 'marketplace:export_modal' item.id %}" class="px-2.5 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-lg font-bold text-xs transition-colors flex items-center gap-1 shadow-sm">
+                <a href="{% url 'marketplace:export_modal' item.id %}" class="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-lg font-bold text-[11px] transition-colors flex items-center gap-1 shadow-xs">
                     <span>📋</span>
-                    <span>Exportar</span>
+                    <span class="hidden sm:inline">Exportar</span>
                 </a>
-                <a href="/admin/core/item/{{ item.id }}/change/" class="px-2.5 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 rounded-lg font-bold text-xs transition-colors flex items-center gap-1 shadow-sm">
+                <a href="/admin/core/item/{{ item.id }}/change/" class="px-2 py-1 bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 rounded-lg font-bold text-[11px] transition-colors flex items-center gap-1 shadow-xs">
                     <span>⚙️</span>
-                    <span>Admin</span>
+                    <span class="hidden sm:inline">Admin</span>
                 </a>
             </div>
         {% endif %}
     </div>
 
-    <!-- Grid Principal (Galeria de Fotos + Painel de Compra/Contato) -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        <!-- Coluna Esquerda: Galeria de Fotos (7 cols) -->
-        <div class="lg:col-span-7 space-y-4">
-            <!-- Imagem Principal em Destaque -->
-            <div class="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm aspect-4/3 flex items-center justify-center relative">
-                {% if item.imagem_principal %}
-                    <img id="mainImage" src="{{ item.imagem_principal.imagem.url }}" alt="{{ item.titulo }}"
-                        class="w-full h-full object-contain bg-slate-900/5">
-                {% else %}
-                    <div class="text-slate-400 text-sm">Sem fotos cadastradas</div>
+    <!-- Painel Principal Compacto (Galeria + Título + Preço + Contatos em 1 única tela no celular) -->
+    <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-4 sm:p-6">
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-5 items-start">
+            
+            <!-- Coluna Esquerda: Galeria de Fotos Compacta com Thumbs Clicáveis -->
+            <div class="md:col-span-6 space-y-2.5">
+                <!-- Imagem Principal com altura controlada para mobile -->
+                <div class="bg-slate-900/5 rounded-2xl border border-slate-100 overflow-hidden relative flex items-center justify-center h-52 sm:h-64 md:h-72">
+                    {% if item.imagem_principal %}
+                        <img id="mainImage" src="{{ item.imagem_principal.imagem.url }}" alt="{{ item.titulo }}"
+                            class="w-full h-full object-contain transition-all duration-300">
+                    {% else %}
+                        <div class="text-slate-400 text-xs">Sem fotos cadastradas</div>
+                    {% endif %}
+                    <span class="absolute top-2.5 left-2.5 px-2.5 py-0.5 bg-white/95 backdrop-blur-md rounded-full text-[11px] font-bold text-slate-800 shadow-xs border border-slate-200/50">
+                        {{ item.get_estado_conservacao_display }}
+                    </span>
+                </div>
+
+                <!-- Miniaturas Clicáveis Rápidas -->
+                {% if item.imagens.count > 1 %}
+                    <div class="flex gap-2 overflow-x-auto pb-1 items-center">
+                        {% for img in item.imagens.all %}
+                            <button type="button" onclick="changeMainImage('{{ img.imagem.url }}', this)"
+                                class="thumb-btn flex-shrink-0 w-12 h-12 rounded-xl overflow-hidden border-2 transition-all {% if forloop.first %}border-emerald-500 ring-2 ring-emerald-300{% else %}border-slate-200 opacity-60 hover:opacity-100{% endif %}">
+                                <img src="{{ img.imagem.url }}" alt="Foto {{ forloop.counter }}" class="w-full h-full object-cover">
+                            </button>
+                        {% endfor %}
+                    </div>
                 {% endif %}
-                <span class="absolute top-3 left-3 px-3 py-1 bg-white/90 backdrop-blur-md rounded-full text-xs font-bold text-slate-800 shadow-sm">
-                    {{ item.get_estado_conservacao_display }}
-                </span>
             </div>
 
-            <!-- Miniaturas Clicáveis -->
-            {% if item.imagens.count > 1 %}
-                <div class="flex gap-3 overflow-x-auto pb-2">
-                    {% for img in item.imagens.all %}
-                        <button type="button" onclick="changeMainImage('{{ img.imagem.url }}', this)"
-                            class="thumb-btn flex-shrink-0 w-20 h-20 rounded-2xl overflow-hidden border-2 transition-all {% if forloop.first %}border-emerald-500 ring-2 ring-emerald-300{% else %}border-slate-200 opacity-70 hover:opacity-100{% endif %}">
-                            <img src="{{ img.imagem.url }}" alt="Foto {{ forloop.counter }}" class="w-full h-full object-cover">
-                        </button>
-                    {% endfor %}
+            <!-- Coluna Direita: Título, Preço e Linha de Contatos Rápida (Menos Box, Mais Velocidade) -->
+            <div class="md:col-span-6 flex flex-col justify-between space-y-3.5">
+                
+                <!-- Categoria e Título -->
+                <div class="space-y-1">
+                    <div class="flex items-center gap-2">
+                        <span class="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800">
+                            {{ item.get_categoria_display }}
+                        </span>
+                        {% if item.tipo_anuncio == 'ambos' %}
+                            <span class="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                Venda & Aluguel
+                            </span>
+                        {% elif item.tipo_anuncio == 'aluguel' %}
+                            <span class="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                Aluguel
+                            </span>
+                        {% endif %}
+                    </div>
+                    <h1 class="text-lg sm:text-xl font-black text-slate-900 leading-snug">
+                        {{ item.titulo }}
+                    </h1>
                 </div>
-            {% endif %}
-        </div>
 
-        <!-- Coluna Direita: Preços, Transparência e Botões de Contato (5 cols) -->
-        <div class="lg:col-span-5 space-y-6">
-            <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-6">
-                <!-- Título e Categoria -->
-                <div>
-                    <span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 mb-2">
-                        {{ item.get_categoria_display }}
-                    </span>
-                    <h1 class="text-xl sm:text-2xl font-black text-slate-900 leading-snug">{{ item.titulo }}</h1>
-                </div>
-
-                <!-- Bloco de Preços e Comparativo -->
-                <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-                    {% if item.preco_usado %}
-                        <div>
-                            <span class="text-xs text-slate-500 font-semibold block">Preço de Venda</span>
-                            <div class="flex items-baseline gap-2">
-                                <span class="text-3xl font-black text-slate-900">R$ {{ item.preco_usado|intcomma }}</span>
-                                {% if item.tipo_anuncio == 'ambos' %}
-                                    <span class="text-xs text-slate-500 font-medium">(à vista / PIX)</span>
-                                {% endif %}
+                <!-- Bloco de Preço & Economia Compacto -->
+                <div class="py-2.5 px-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1.5">
+                    <div class="flex items-baseline justify-between flex-wrap gap-2">
+                        {% if item.preco_usado %}
+                            <div class="flex items-baseline gap-1.5">
+                                <span class="text-2xl sm:text-3xl font-black text-slate-900">R$ {{ item.preco_usado|intcomma }}</span>
+                                <span class="text-[11px] text-slate-500 font-medium">(à vista / PIX)</span>
                             </div>
-                        </div>
-                    {% endif %}
+                        {% elif item.preco_aluguel %}
+                            <div class="flex items-baseline gap-1.5">
+                                <span class="text-2xl sm:text-3xl font-black text-blue-700">R$ {{ item.preco_aluguel|intcomma }}</span>
+                                <span class="text-[11px] text-slate-500 font-medium">/ período</span>
+                            </div>
+                        {% endif %}
 
-                    {% if item.preco_novo_referencia and item.preco_usado and economia_reais %}
-                        <div class="pt-2 border-t border-slate-200/80 flex items-center justify-between text-xs">
-                            <span class="text-slate-500">Novo nas lojas: <strong class="line-through text-slate-400">R$ {{ item.preco_novo_referencia|intcomma }}</strong></span>
-                            <span class="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold">
+                        {% if item.preco_novo_referencia and item.preco_usado and economia_reais %}
+                            <span class="text-[11px] font-bold text-emerald-700 bg-emerald-100/80 border border-emerald-200 px-2 py-0.5 rounded-lg flex items-center gap-1">
                                 Economia: R$ {{ economia_reais|intcomma }} (-{{ porcentagem_economia }}%)
                             </span>
-                        </div>
-                    {% endif %}
-
-                    {% if item.preco_aluguel and item.tipo_anuncio in 'aluguel,ambos' %}
-                        <div class="pt-2 border-t border-slate-200/80 flex items-center justify-between text-xs">
-                            <span class="text-slate-600 font-semibold">🔄 Opção de Aluguel:</span>
-                            <span class="font-extrabold text-blue-700 text-sm">R$ {{ item.preco_aluguel|intcomma }} / período</span>
-                        </div>
-                    {% endif %}
-                </div>
-
-                <!-- Botão de Contato Inteligente Principal (WhatsApp) -->
-                <div class="space-y-3">
-                    <a href="{{ wa_data.whatsapp_url }}" target="_blank" rel="noopener noreferrer"
-                        class="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm rounded-2xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 active:scale-[0.98]">
-                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/></svg>
-                        <span>Tenho Interesse (Chamar no WhatsApp)</span>
-                    </a>
-                    <p class="text-[11px] text-center text-slate-400">
-                        Abre seu WhatsApp com a mensagem de cotação já preenchida.
-                    </p>
-                </div>
-
-                <!-- Outros Canais de Contato & PIX -->
-                <div class="pt-4 border-t border-slate-100 space-y-2">
-                    <span class="text-[11px] uppercase font-bold text-slate-400 block tracking-wider">Outras formas de contato:</span>
-                    <div class="grid grid-cols-2 gap-2 text-xs">
-                        {% if configuracao.telegram %}
-                            <a href="https://t.me/{{ configuracao.telegram|cut:'@' }}" target="_blank"
-                                class="p-2.5 bg-sky-50 hover:bg-sky-100 text-sky-700 rounded-xl font-bold transition-colors flex items-center justify-center gap-1.5">
-                                <span>Telegram</span>
-                            </a>
                         {% endif %}
+                    </div>
+
+                    {% if item.preco_novo_referencia and item.preco_usado %}
+                        <div class="text-[11px] text-slate-500 flex items-center justify-between">
+                            <span>Referência novo na loja: <strong class="line-through text-slate-400">R$ {{ item.preco_novo_referencia|intcomma }}</strong></span>
+                            {% if item.preco_aluguel and item.tipo_anuncio == 'ambos' %}
+                                <span class="font-bold text-blue-700">🔄 Aluguel: R$ {{ item.preco_aluguel|intcomma }}</span>
+                            {% endif %}
+                        </div>
+                    {% elif item.preco_aluguel and item.tipo_anuncio == 'ambos' %}
+                        <div class="text-[11px] text-blue-700 font-bold">
+                            🔄 Opção de aluguel: R$ {{ item.preco_aluguel|intcomma }} / período
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- Linha de Ação Rápida: WhatsApp + Line Icons + PIX Visível -->
+                <div class="space-y-2 pt-1">
+                    
+                    <!-- Botões de Contato em Linha -->
+                    <div class="flex items-center gap-2">
+                        <!-- Botão WhatsApp com Line Icon -->
+                        <a href="{{ wa_data.whatsapp_url }}" target="_blank" rel="noopener noreferrer"
+                            class="flex-1 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95">
+                            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 21l1.65-3.8A9 9 0 1121 12c0 4.97-4.03 9-9 9a8.96 8.96 0 01-4.2-.95L3 21z" />
+                            </svg>
+                            <span>Tenho Interesse (WhatsApp)</span>
+                        </a>
+
+                        <!-- Line Icon E-mail -->
                         {% if configuracao.email %}
                             <a href="mailto:{{ configuracao.email }}?subject=Interesse%20no%20item%20{{ item.titulo|urlencode }}"
-                                class="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition-colors flex items-center justify-center gap-1.5">
-                                <span>E-mail</span>
+                                title="Enviar E-mail: {{ configuracao.email }}"
+                                class="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl transition-all flex items-center justify-center active:scale-95" aria-label="Enviar E-mail">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                </svg>
+                            </a>
+                        {% endif %}
+
+                        <!-- Line Icon Telegram -->
+                        {% if configuracao.telegram %}
+                            <a href="https://t.me/{{ configuracao.telegram|cut:'@' }}" target="_blank"
+                                title="Telegram: {{ configuracao.telegram }}"
+                                class="p-2.5 bg-sky-50 hover:bg-sky-100 text-sky-600 border border-sky-200 rounded-xl transition-all flex items-center justify-center active:scale-95" aria-label="Telegram">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+                                </svg>
                             </a>
                         {% endif %}
                     </div>
 
+                    <!-- Linha do PIX: Chave Visível + Copiar com 1 Clique -->
                     {% if configuracao.chave_pix %}
-                        <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-200 space-y-1.5">
-                            <div class="flex items-center justify-between">
-                                <span class="text-[11px] font-bold text-emerald-950">Chave PIX do Vendedor</span>
-                                <button onclick="AIFeedback.copyTextToClipboard('{{ configuracao.chave_pix|escapejs }}', this);"
-                                    class="text-[10px] bg-emerald-600 text-white px-2 py-0.5 rounded font-bold hover:bg-emerald-700 transition-all active:scale-95 flex items-center gap-1">
-                                    <span>Copiar PIX</span>
-                                </button>
+                        <div class="flex items-center justify-between gap-2 px-3 py-2 bg-emerald-50/80 border border-emerald-200/90 rounded-xl text-xs">
+                            <div class="flex items-center gap-1.5 overflow-hidden">
+                                <svg class="w-3.5 h-3.5 text-emerald-700 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                                </svg>
+                                <span class="text-[10px] font-bold text-emerald-950 uppercase">PIX:</span>
+                                <span class="font-mono text-xs text-emerald-900 font-semibold truncate select-all">{{ configuracao.chave_pix }}</span>
                             </div>
-                            <p class="font-mono text-xs text-emerald-800 break-all select-all">{{ configuracao.chave_pix }}</p>
+                            <button type="button" onclick="AIFeedback.copyTextToClipboard('{{ configuracao.chave_pix|escapejs }}', this);"
+                                class="flex-shrink-0 text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2.5 py-1 rounded-lg transition-all active:scale-95 flex items-center gap-1 shadow-xs">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                                </svg>
+                                <span>Copiar</span>
+                            </button>
                         </div>
                     {% endif %}
+
                 </div>
+
             </div>
         </div>
     </div>
 
-    <!-- Seção de Descrição e Condições -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+    <!-- Seção de Descrição e Condições (Abaixo da Dobra) -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div class="lg:col-span-8 space-y-6">
             <!-- Descrição Completa -->
-            <div class="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+            <div class="bg-white p-5 sm:p-7 rounded-3xl border border-slate-200 shadow-sm space-y-4">
                 <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                    <h2 class="text-lg font-black text-slate-900 flex items-center gap-2">
+                    <h2 class="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
                         <span>📝</span>
                         <span>Descrição Detalhada</span>
                     </h2>
@@ -195,18 +231,17 @@
                     {% endif %}
                 </div>
             </div>
-
         </div>
 
         <!-- Coluna Lateral: Detalhes Visíveis & Retirada -->
         <div class="lg:col-span-4 space-y-6">
             {% if item.defeitos_visiveis %}
-                <div class="bg-amber-50/80 border border-amber-200/80 rounded-3xl p-5 space-y-3 shadow-sm">
+                <div class="bg-amber-50/80 border border-amber-200/80 rounded-3xl p-4 sm:p-5 space-y-3 shadow-sm">
                     <div class="flex items-center gap-2 text-amber-900 font-bold text-sm">
                         <span>🔍</span>
                         <h3>Detalhes Visíveis & Estado Real</h3>
                     </div>
-                    <div class="text-xs text-amber-950 leading-relaxed bg-white/90 p-3.5 rounded-xl border border-amber-200/60 font-sans prose-desapego">
+                    <div class="text-xs text-amber-950 leading-relaxed bg-white/90 p-3 rounded-xl border border-amber-200/60 font-sans prose-desapego">
                         {{ item.defeitos_visiveis|render_markdown }}
                     </div>
                     <p class="text-[10px] text-amber-800/80">
@@ -215,11 +250,11 @@
                 </div>
             {% endif %}
 
-            <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+            <div class="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-sm space-y-3.5">
                 <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
                     <span>🚚</span> Condições de Retirada & Envio
                 </h3>
-                <ul class="space-y-3 text-xs text-slate-600">
+                <ul class="space-y-2.5 text-xs text-slate-600">
                     <li class="flex items-start gap-2">
                         <span class="text-emerald-600 font-bold">✔</span>
                         <span><strong>Retirada em mãos:</strong> Combinar local e horário com o vendedor. Pagamento em dinheiro ou Pix.</span>
@@ -233,7 +268,7 @@
                         <span><strong>Garantia:</strong> Produto testado e funcionando. Responsabilidade em caso de defeito no envio.</span>
                     </li>
                 </ul>
-                <div class="pt-3 border-t border-slate-100 text-[11px] text-slate-500 italic">
+                <div class="pt-2.5 border-t border-slate-100 text-[11px] text-slate-500 italic">
                     💡 Anúncio 100% transparente. Dúvidas? Entre em contato pelo WhatsApp.
                 </div>
             </div>
@@ -242,18 +277,18 @@
 
     <!-- Itens Relacionados -->
     {% if itens_relacionados %}
-        <div class="pt-8 border-t border-slate-200 space-y-4">
-            <h2 class="text-xl font-black text-slate-900">Outros Desapegos na Mesma Categoria</h2>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div class="pt-6 border-t border-slate-200 space-y-3">
+            <h2 class="text-lg font-black text-slate-900">Outros Desapegos na Mesma Categoria</h2>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
                 {% for rel in itens_relacionados %}
-                    <a href="{% url 'core:item_detail' rel.slug %}" class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow group">
+                    <a href="{% url 'core:item_detail' rel.slug %}" class="bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow group">
                         {% if rel.imagem_principal %}
-                            <img src="{{ rel.imagem_principal.imagem.url }}" alt="{{ rel.titulo }}" class="w-full h-32 object-cover rounded-xl">
+                            <img src="{{ rel.imagem_principal.imagem.url }}" alt="{{ rel.titulo }}" class="w-full h-28 sm:h-32 object-cover rounded-xl">
                         {% else %}
-                            <div class="w-full h-32 bg-slate-100 rounded-xl flex items-center justify-center text-xs text-slate-400">Sem foto</div>
+                            <div class="w-full h-28 sm:h-32 bg-slate-100 rounded-xl flex items-center justify-center text-xs text-slate-400">Sem foto</div>
                         {% endif %}
                         <h4 class="font-bold text-xs text-slate-900 mt-2 line-clamp-1 group-hover:text-emerald-600 transition-colors">{{ rel.titulo }}</h4>
-                        <p class="text-xs font-black text-emerald-700 mt-1">R$ {{ rel.preco_usado|floatformat:2 }}</p>
+                        <p class="text-xs font-black text-emerald-700 mt-0.5">R$ {{ rel.preco_usado|floatformat:2 }}</p>
                     </a>
                 {% endfor %}
             </div>
@@ -265,13 +300,19 @@
 {% block extra_js %}
 <script>
     function changeMainImage(imgUrl, btnElement) {
-        document.getElementById('mainImage').src = imgUrl;
+        const mainImg = document.getElementById('mainImage');
+        if (mainImg) {
+            mainImg.src = imgUrl;
+        }
         document.querySelectorAll('.thumb-btn').forEach(btn => {
             btn.classList.remove('border-emerald-500', 'ring-2', 'ring-emerald-300');
-            btn.classList.add('border-slate-200', 'opacity-70');
+            btn.classList.add('border-slate-200', 'opacity-60');
         });
-        btnElement.classList.remove('border-slate-200', 'opacity-70');
-        btnElement.classList.add('border-emerald-500', 'ring-2', 'ring-emerald-300');
+        if (btnElement) {
+            btnElement.classList.remove('border-slate-200', 'opacity-60');
+            btnElement.classList.add('border-emerald-500', 'ring-2', 'ring-emerald-300');
+        }
     }
 </script>
 {% endblock %}
+
