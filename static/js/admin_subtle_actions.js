@@ -238,7 +238,7 @@
 
     function parseMarkdownToHtml(md) {
         if (!md || typeof md !== 'string' || !md.trim()) {
-            return '<p class="admin-md-empty-hint"><em>Nenhuma descrição gerada por IA ainda. Execute a análise de IA acima para criar o copywriting automático.</em></p>';
+            return '<p class="admin-md-empty-hint"><em>Nenhuma descrição gerada por IA ainda. Digite o Markdown no editor à direita ou execute a análise de IA acima.</em></p>';
         }
 
         let text = md;
@@ -254,16 +254,19 @@
         text = text.replace(/^(#{1,6}[ \t]+)\*\*(.*?)\*\*/gm, '$1$2');
 
         const escapeHtml = (str) =>
-
             str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
         const inlineFormat = (str) => {
             // Negrito **texto** ou __texto__
             str = str.replace(/(\*\*|__)(.*?)\1/g, '<strong>$2</strong>');
+            // Tachado ~~texto~~
+            str = str.replace(/~~(.*?)~~/g, '<del>$1</del>');
             // Itálico *texto* ou _texto_
             str = str.replace(/(\*|_)(.*?)\1/g, '<em>$2</em>');
             // Código `code`
             str = str.replace(/`([^`]+)`/g, '<code>$1</code>');
+            // Links [texto](url) -> texto destacado
+            str = str.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="admin-md-link">$1</a>');
             return str;
         };
 
@@ -275,7 +278,22 @@
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trimEnd();
 
-            // Cabeçalhos (#, ##, ###, ####)
+            // Divisor horizontal (--- ou ***)
+            if (/^(-{3,}|\*{3,}|_{3,})$/.test(line.trim())) {
+                if (inList) { html += listType === 'ol' ? '</ol>' : '</ul>'; inList = false; }
+                html += '<hr class="admin-md-hr" />';
+                continue;
+            }
+
+            // Blockquote (> texto)
+            const quoteMatch = line.match(/^>\s*(.*)$/);
+            if (quoteMatch) {
+                if (inList) { html += listType === 'ol' ? '</ol>' : '</ul>'; inList = false; }
+                html += `<blockquote class="admin-md-quote">${inlineFormat(escapeHtml(quoteMatch[1]))}</blockquote>`;
+                continue;
+            }
+
+            // Cabeçalhos (#, ##, ###, ####, #####, ######)
             const headerMatch = line.match(/^(#{1,6})\s+(.*)$/);
             if (headerMatch) {
                 if (inList) { html += listType === 'ol' ? '</ol>' : '</ul>'; inList = false; }
@@ -285,8 +303,8 @@
                 continue;
             }
 
-            // Itens de lista não ordenada (- item ou * item)
-            const ulMatch = line.match(/^[-*]\s+(.*)$/);
+            // Itens de lista não ordenada (- item ou * item ou + item)
+            const ulMatch = line.match(/^[-*+]\s+(.*)$/);
             if (ulMatch) {
                 if (!inList || listType !== 'ul') {
                     if (inList) html += listType === 'ol' ? '</ol>' : '</ul>';
@@ -320,7 +338,7 @@
                 continue;
             }
 
-            // Parágrafo
+            // Parágrafo normal
             if (inList) {
                 html += listType === 'ol' ? '</ol>' : '</ul>';
                 inList = false;
@@ -349,42 +367,86 @@
         wrapper.innerHTML = `
             <div class="admin-md-toolbar">
                 <div class="admin-md-tabs">
-                    <button type="button" class="admin-md-tab-btn is-active" data-mode="rendered">
+                    <button type="button" class="admin-md-tab-btn is-active" data-mode="rendered" title="Visualizar descrição formatada em tela cheia">
                         <svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
                         <span>Visual Formatado</span>
                     </button>
-                    <button type="button" class="admin-md-tab-btn" data-mode="raw">
-                        <svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;"><path d="m18 2 4 4-14 14H4v-4L18 2z"/></svg>
+                    <button type="button" class="admin-md-tab-btn" data-mode="split" title="Editar Markdown à direita e acompanhar a formatação ao vivo à esquerda">
+                        <svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 3v18"/><path d="m16 8 2 2-2 2"/><path d="m8 14-2-2 2-2"/></svg>
                         <span>Código / Markdown</span>
                     </button>
                 </div>
-                <div style="display: flex; align-items: center; gap: 6px;">
+                <div class="admin-md-toolbar-actions">
+                    <span class="admin-md-live-badge" id="admin-md-live-indicator" style="display: none;" title="Edições no Markdown são atualizadas instantaneamente na prévia">
+                        <span class="admin-md-live-dot"></span> Ao Vivo
+                    </span>
                     <button type="button" class="admin-md-copy-btn" id="btn-copy-ia-to-manual" title="Copiar este texto da IA para o campo 'Descrição Manual / Final' para poder personalizá-lo">
                         <svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
                         <span>Copiar para Descrição Manual</span>
                     </button>
                 </div>
             </div>
-            <div class="admin-md-rendered-view" id="admin-md-rendered-id_descricao_ia"></div>
+            <div class="admin-md-workspace mode-rendered" id="admin-md-workspace-id_descricao_ia">
+                <!-- Painel Esquerdo: Prévia Formatada -->
+                <div class="admin-md-pane admin-md-preview-pane">
+                    <div class="admin-md-pane-header">
+                        <div class="admin-md-pane-title">
+                            <svg viewBox="0 0 24 24" style="width:12px; height:12px; stroke:currentColor; fill:none; stroke-width:1.8;"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                            <span>Prévia Visual (Ao Vivo)</span>
+                        </div>
+                        <span class="admin-md-pane-badge">Renderização em Tempo Real</span>
+                    </div>
+                    <div class="admin-md-rendered-view" id="admin-md-rendered-id_descricao_ia"></div>
+                </div>
+
+                <!-- Painel Direito: Editor Markdown -->
+                <div class="admin-md-pane admin-md-editor-pane">
+                    <div class="admin-md-pane-header">
+                        <div class="admin-md-pane-title">
+                            <svg viewBox="0 0 24 24" style="width:12px; height:12px; stroke:currentColor; fill:none; stroke-width:1.8;"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                            <span>Código Markdown (Editor)</span>
+                        </div>
+                        <span class="admin-md-stats" id="admin-md-stats-id_descricao_ia">0 caracteres</span>
+                    </div>
+                    <div class="admin-md-editor-body" id="admin-md-editor-slot-id_descricao_ia"></div>
+                </div>
+            </div>
         `;
 
-        // Insere o card antes da textarea e oculta a textarea por padrão (modo formatado ativo)
+        // Insere o card antes da textarea
         iaField.parentNode.insertBefore(wrapper, iaField);
-        iaField.style.display = 'none';
 
+        // Move a textarea nativa para o slot do editor (preservando o formulário Django)
+        const editorSlot = wrapper.querySelector('#admin-md-editor-slot-id_descricao_ia');
+        editorSlot.appendChild(iaField);
+
+        const workspace = wrapper.querySelector('#admin-md-workspace-id_descricao_ia');
         const renderedView = wrapper.querySelector('#admin-md-rendered-id_descricao_ia');
         const tabBtns = wrapper.querySelectorAll('.admin-md-tab-btn');
+        const liveIndicator = wrapper.querySelector('#admin-md-live-indicator');
+        const statsEl = wrapper.querySelector('#admin-md-stats-id_descricao_ia');
         const copyBtn = wrapper.querySelector('#btn-copy-ia-to-manual');
+
+        const updateStats = () => {
+            if (!statsEl) return;
+            const text = iaField.value || '';
+            const charCount = text.length;
+            const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
+            statsEl.textContent = `${charCount} caracteres • ${wordCount} palavras`;
+        };
 
         const updateRendered = () => {
             renderedView.innerHTML = parseMarkdownToHtml(iaField.value);
+            updateStats();
         };
 
         // Renderiza estado inicial
         updateRendered();
 
-        // Escuta digitação na textarea (quando no modo raw)
+        // Escuta digitação em tempo real na textarea (modo split/edição)
         iaField.addEventListener('input', updateRendered);
+        iaField.addEventListener('keyup', updateRendered);
+        iaField.addEventListener('paste', () => setTimeout(updateRendered, 50));
         iaField.addEventListener('change', updateRendered);
 
         // Alternância de abas
@@ -395,12 +457,13 @@
 
                 const mode = btn.dataset.mode;
                 if (mode === 'rendered') {
+                    workspace.className = 'admin-md-workspace mode-rendered';
+                    if (liveIndicator) liveIndicator.style.display = 'none';
                     updateRendered();
-                    renderedView.style.display = 'block';
-                    iaField.style.display = 'none';
                 } else {
-                    renderedView.style.display = 'none';
-                    iaField.style.display = 'block';
+                    workspace.className = 'admin-md-workspace mode-split';
+                    if (liveIndicator) liveIndicator.style.display = 'inline-flex';
+                    updateRendered();
                     iaField.focus();
                 }
             });
@@ -435,8 +498,15 @@
     function updateAdminMarkdownPreviews() {
         const iaField = document.getElementById('id_descricao_ia');
         const renderedView = document.getElementById('admin-md-rendered-id_descricao_ia');
+        const statsEl = document.getElementById('admin-md-stats-id_descricao_ia');
         if (iaField && renderedView) {
             renderedView.innerHTML = parseMarkdownToHtml(iaField.value);
+            if (statsEl) {
+                const text = iaField.value || '';
+                const charCount = text.length;
+                const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
+                statsEl.textContent = `${charCount} caracteres • ${wordCount} palavras`;
+            }
         }
     }
 
