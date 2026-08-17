@@ -129,13 +129,16 @@ def upload_rapido(request):
             agora = timezone.localtime(timezone.now()).strftime('%d/%m às %H:%M')
             titulo_provisorio = f"Item em análise ({agora})"
 
+        descricao_sugerida = request.POST.get('descricao_ia', '').strip()
+
         item = Item.objects.create(
             titulo=titulo_provisorio,
             categoria=categoria,
             tipo_anuncio=tipo_anuncio,
             status=Item.Status.RASCUNHO,
             defeitos_visiveis=observacoes,
-            descricao_manual=observacoes if observacoes else ""
+            descricao_ia=descricao_sugerida,
+            descricao_manual=""
         )
 
         for i, imagem_file in enumerate(imagens):

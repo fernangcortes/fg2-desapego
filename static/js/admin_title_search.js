@@ -541,7 +541,7 @@
             const descCheckbox = popover.querySelector('#smart-apply-desc-checkbox');
             const applyDesc = !descCheckbox || descCheckbox.checked;
             if (applyDesc && suggestion.descricao) {
-                // No Django Admin
+                // No Django Admin e Upload Rápido (campo id_descricao_ia)
                 const descIaField = document.getElementById('id_descricao_ia');
                 if (descIaField) {
                     descIaField.value = suggestion.descricao;
@@ -549,13 +549,6 @@
                     if (typeof window.updateAdminMarkdownPreviews === 'function') {
                         window.updateAdminMarkdownPreviews();
                     }
-                }
-
-                // No Upload Rápido
-                const obsField = document.getElementById('observacoes');
-                if (obsField) {
-                    obsField.value = suggestion.descricao;
-                    obsField.dispatchEvent(new Event('change', { bubbles: true }));
                 }
             }
 
